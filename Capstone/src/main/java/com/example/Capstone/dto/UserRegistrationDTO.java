@@ -9,8 +9,7 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
-@Getter
-@Setter
+
 @Data
 public class UserRegistrationDTO {
     @NotBlank(message = "Campo obbligatorio")
@@ -27,7 +26,7 @@ public class UserRegistrationDTO {
     @NotBlank(message = "Password obbligatoria")
     private String password;
 
-    @NotBlank(message = "Conferma la password")
-    private String confirmPassword;
+//   @NotBlank(message = "Conferma la password")
+//    private String confirmPassword;
 
 }
