@@ -1,7 +1,7 @@
 package com.example.Capstone.config;
 
 import com.example.Capstone.entity.User;
-import com.example.Capstone.service.UserService;
+import com.example.Capstone.repository.UserRepository;
 import com.example.Capstone.utils.JWTTools;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -11,7 +11,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,19 +26,19 @@ import java.util.List;
 public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
     private final JWTTools jwtTools;
-    private final UserService userService;
+    private final UserRepository userRepository;
 
     @Autowired
-    public JWTAuthenticationFilter(JWTTools jwtTools,@Lazy UserService userService) {
+    public JWTAuthenticationFilter(JWTTools jwtTools, UserRepository userRepository) {
         this.jwtTools = jwtTools;
-        this.userService = userService;
+        this.userRepository = userRepository;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Permetti le richieste OPTIONS per il CORS
+        // Allow OPTIONS requests for CORS
         if (request.getMethod().equals("OPTIONS")) {
             filterChain.doFilter(request, response);
             return;
@@ -47,7 +46,7 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader("Authorization");
 
-        // Se il percorso è pubblico, continua senza autenticazione
+        // If the path is public, continue without authentication
         String requestURI = request.getRequestURI();
         if (isPublicEndpoint(requestURI)) {
             filterChain.doFilter(request, response);
@@ -58,17 +57,18 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
         String userEmail = null;
 
         try {
-            // Controlla se l'header esiste e ha il formato corretto
+            // Check if the header exists and has the correct format
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
                 userEmail = jwtTools.extractEmail(token);
 
-                // Se abbiamo un'email e non c'è già un'autenticazione nel contesto
+                // If we have an email and there is no authentication in the context
                 if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    User user = userService.findByEmail(userEmail);
+                    User user = userRepository.findByEmail(userEmail)
+                            .orElseThrow(() -> new RuntimeException("User not found"));
 
                     if (jwtTools.validateToken(token, userEmail)) {
-                        // Crea il token di autenticazione con il ruolo dell'utente
+                        // Create authentication token with user role
                         SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRuolo().name());
                         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                                 user,
@@ -85,13 +85,13 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
 
         } catch (ExpiredJwtException e) {
-            sendError(response, "Token JWT scaduto");
+            sendError(response, "JWT token expired");
         } catch (MalformedJwtException e) {
-            sendError(response, "Token JWT non valido");
+            sendError(response, "Invalid JWT token");
         } catch (JwtException e) {
-            sendError(response, "Errore nel token JWT: " + e.getMessage());
+            sendError(response, "JWT token error: " + e.getMessage());
         } catch (Exception e) {
-            sendError(response, "Errore di autenticazione: " + e.getMessage());
+            sendError(response, "Authentication error: " + e.getMessage());
         }
     }
 

@@ -1,14 +1,13 @@
 package com.example.Capstone.service;
 
 import com.example.Capstone.dto.UserDTO;
-
 import com.example.Capstone.dto.UserRegistrationDTO;
 import com.example.Capstone.entity.Role;
 import com.example.Capstone.entity.User;
 import com.example.Capstone.exception.UserAlreadyExistsException;
 import com.example.Capstone.exception.UserNotFoundException;
 import com.example.Capstone.repository.UserRepository;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,17 +21,16 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-
-    //FARE AUTORIWIRED
+    @Autowired
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
-         // corretto diocane
-    // Registrazione Utente
+
+    // User Registration
     public UserDTO registerUser(UserRegistrationDTO registrationDTO) throws UserAlreadyExistsException {
         if (userRepository.existsByEmail(registrationDTO.getEmail())) {
-            throw new UserAlreadyExistsException("Email già registrata: " + registrationDTO.getEmail());
+            throw new UserAlreadyExistsException("Email already registered: " + registrationDTO.getEmail());
         }
 
         User newUser = new User();
@@ -40,15 +38,11 @@ public class UserService {
         newUser.setCognome(registrationDTO.getCognome());
         newUser.setEmail(registrationDTO.getEmail());
         newUser.setPassword(passwordEncoder.encode(registrationDTO.getPassword()));
-        newUser.setRuolo(Role.USER); // Usa ROLE_USER come default
+        newUser.setRuolo(Role.USER); // Default role is USER
 
         newUser = userRepository.save(newUser);
         return convertToDTO(newUser);
-
-
     }
-
-
 
     public User findById(Long id) {
         Optional<User> userOptional = userRepository.findById(id);
@@ -57,60 +51,24 @@ public class UserService {
 
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
     }
 
-    // Recupera Utente per ID solo per admin
+    // Get User by ID
     public UserDTO getUserById(Long id) throws UserNotFoundException {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Utente non trovato con ID: " + id));
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
         return convertToDTO(user);
     }
 
-    // Aggiorna Utente (SOLO ADMIN)
-//    @PreAuthorize("hasRole('ADMIN')")
-//    public UserDTO updateUser(Long id, UserDTO userDTO) throws UserNotFoundException {
-//        User existingUser = userRepository.findById(id)
-//                .orElseThrow(() -> new UserNotFoundException("Utente non trovato con ID: " + id));
-//
-//        existingUser.setNome(userDTO.getNome());
-//        existingUser.setCognome(userDTO.getCognome());
-//        existingUser.setEmail(userDTO.getEmail());
-//
-//        // Solo ADMIN può modificare il ruolo
-//        if (userDTO.getRuolo() != null) {
-//            existingUser.setRuolo(userDTO.getRuolo());
-//        }
-//
-//        User updatedUser = userRepository.save(existingUser);
-//        return convertToDTO(updatedUser);
-//    }
-
-    // Cambio Password (Utente o ADMIN)
-
-    public String changePassword(Long userId,String passwordDTO) {
+    // Change Password
+    public void changePassword(Long userId, String newPassword) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("Utente non trovato"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        // Verifica la vecchia password se richiesto
-        // if (!passwordEncoder.matches(passwordDTO.getOldPassword(), user.getPassword())) {
-        //     throw new InvalidPasswordException("Password corrente errata");
-        // }
-
-        user.setPassword(passwordEncoder.encode( passwordDTO));
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-
-        return "password cambiata";
     }
-
-    // Elimina Utente (SOLO ADMIN)
-//    @PreAuthorize("hasRole('ADMIN')")
-//    public void deleteUser(Long id) throws UserNotFoundException {
-//        if (!userRepository.existsById(id)) {
-//            throw new UserNotFoundException("Utente non trovato con ID: " + id);
-//        }
-//        userRepository.deleteById(id);
-//    }
 
     private UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
@@ -120,15 +78,4 @@ public class UserService {
 
         return dto;
     }
-
-
-//    private UserDTO convertFromRegisterToDTO(UserRegistrationDTO userRegistrationDTO){
-//
-//        UserDTO userDTO = new UserDTO();
-//        userDTO.setNome(userRegistrationDTO.getNome());
-//        userDTO.setCognome(userRegistrationDTO.getCognome());
-//        userDTO.setEmail(userRegistrationDTO.getEmail());
-//
-//        return userDTO;
-//    }
 }

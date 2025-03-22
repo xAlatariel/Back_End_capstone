@@ -18,12 +18,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.stream.Collectors;
 
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
-
-
 
     @Autowired
     UserService userService;
@@ -34,9 +31,6 @@ public class UserController {
     @Autowired
     PasswordEncoder passwordEncoder;
 
-
-
-
     @PostMapping("/register")
     public ResponseEntity<UserDTO> registerUser(
             @Valid @RequestBody UserRegistrationDTO registrationDTO,
@@ -44,7 +38,7 @@ public class UserController {
     ) throws UserAlreadyExistsException, BadRequestException {
         // Controlla gli errori di validazione
         if (validation.hasErrors()) {
-            throw new BadRequestException("Errori di validazione: " +
+            throw new BadRequestException("Validation errors: " +
                     validation.getAllErrors().stream()
                             .map(error -> error.getDefaultMessage())
                             .collect(Collectors.joining(", ")));
@@ -54,35 +48,6 @@ public class UserController {
         return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
-
-
-
-
-//    @PostMapping("/login")
-//    @ResponseStatus(HttpStatus.OK)
-//    public APIResponse<TokenDTO> login(@Valid @RequestBody LoginDTO credentials,
-//                                       BindingResult validation) throws BadRequestException {
-//        // Verifica gli errori di validazione
-//        if (validation.hasErrors()) {
-//            throw new BadRequestException("Dati di login non validi");
-//        }
-//
-//        // Trova l'utente tramite email
-//        User found = userService.findByEmail(credentials.email());
-//
-//        // Verifica la password usando PasswordEncoder
-//        if (!passwordEncoder.matches(credentials.password(), found.getPassword())) {
-//            throw new BadRequestException("Password errata");
-//        }
-//
-//        // Genera il token JWT
-//        String token = jwt.createToken(credentials.email());
-//
-//        // Restituisci la risposta con il token
-//        return new APIResponse<>(APIStatus.SUCCESS, new TokenDTO(token));
-//    }
-
-
     @PostMapping("/login")
     public ResponseEntity<APIResponse<TokenDTO>> login(
             @Valid @RequestBody LoginDTO credentials,
@@ -90,7 +55,7 @@ public class UserController {
     ) throws BadRequestException {
         // Verifica gli errori di validazione
         if (validation.hasErrors()) {
-            throw new BadRequestException("Dati di login non validi");
+            throw new BadRequestException("Invalid login data");
         }
 
         // Trova l'utente tramite email
@@ -99,22 +64,19 @@ public class UserController {
 
             // Verifica la password usando PasswordEncoder
             if (!passwordEncoder.matches(credentials.password(), found.getPassword())) {
-                throw new BadRequestException("Password errata");
+                throw new BadRequestException("Wrong password");
             }
 
             // Genera il token JWT
-            String token = jwt.createToken(credentials.email());
+            String token = jwt.createToken(credentials.email(), found.getRuolo());
 
             // Restituisci la risposta con il token
             APIResponse<TokenDTO> response = new APIResponse<>(APIStatus.SUCCESS, new TokenDTO(token));
             return ResponseEntity.ok(response);
         } catch (UserNotFoundException e) {
-            throw new BadRequestException("Utente non trovato");
+            throw new BadRequestException("User not found");
         }
     }
-
-
-
 
     // Recupera Utente per ID (SOLO ADMIN o utente stesso)
     @GetMapping("/{id}")
@@ -124,26 +86,14 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
-    //
-
-
-
-//     Cambio Password (Utente stesso o ADMIN)
+    // Cambio Password (Utente stesso o ADMIN)
     @PostMapping("/{id}/change-password")
     @PreAuthorize("#id == principal.id or hasRole('ADMIN')")
     public ResponseEntity<Void> changePassword(
             @PathVariable Long id,
-            @Valid @RequestBody String passwordDTO
+            @Valid @RequestBody PasswordUpdateDTO passwordDTO
     ) {
-        String response = userService.changePassword(id, passwordDTO);
+        userService.changePassword(id, passwordDTO.getNewPassword());
         return ResponseEntity.ok().build();
     }
-
-//    // Elimina Utente (SOLO ADMIN)
-//    @DeleteMapping("/{id}")
-//    @PreAuthorize("hasRole('ADMIN')")
-//    public ResponseEntity<Void> deleteUser(@PathVariable Long id) throws UserNotFoundException {
-//        userService.deleteUser(id);
-//        return ResponseEntity.noContent().build();
-//    }
 }

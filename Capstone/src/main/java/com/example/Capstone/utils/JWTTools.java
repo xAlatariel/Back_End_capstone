@@ -1,5 +1,6 @@
 package com.example.Capstone.utils;
 
+import com.example.Capstone.entity.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -14,7 +15,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-
 @Data
 @Component
 public class JWTTools {
@@ -22,11 +22,12 @@ public class JWTTools {
     @Value("${spring.jwt.secret}")
     private String secret;
 
-    // Aumentato a 24 ore per comodità, ma puoi regolarlo come preferisci
+    // Increased to 24 hours for convenience, adjust as needed
     private final long jwtExpirationMs = 24 * 60 * 60 * 1000;
 
-    public String createToken(String email) {
+    public String createToken(String email, Role role) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role.name());
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(email)
