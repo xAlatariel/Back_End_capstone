@@ -55,7 +55,7 @@ public class TableReservationController {
 
 
 
-
+    //corretto
     @GetMapping("/{id}")
     @PreAuthorize("@reservationSecurityService.canAccessReservation(#id, principal)")
     public ResponseEntity<TableReservationResponseDTO> getReservation(@PathVariable Long id)
@@ -65,15 +65,23 @@ public class TableReservationController {
 
 
 
-
+    //corretto
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TableReservationResponseDTO>> getAllReservations() {
         return ResponseEntity.ok(reservationService.getAllReservations());
     }
 
+    //corretto
+    @GetMapping("/user")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<List<TableReservationResponseDTO>> getUserReservations(
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(reservationService.getReservationsByUserId(user.getId()));
+    }
 
-
+    //corretto
     @GetMapping("/date/{date}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TableReservationResponseDTO>> getReservationsByDate(
@@ -82,7 +90,7 @@ public class TableReservationController {
         return ResponseEntity.ok(reservationService.getReservationsByDate(date));
     }
 
-
+    //corretto
     @PutMapping("/{id}")
     @PreAuthorize("@reservationSecurityService.isOwner(#id, principal)")
     public ResponseEntity<TableReservationResponseDTO> updateReservation(
@@ -92,7 +100,7 @@ public class TableReservationController {
         return ResponseEntity.ok(reservationService.updateReservation(id, request));
     }
 
-
+    //corretto
     @DeleteMapping("/{id}")
     @PreAuthorize("@reservationSecurityService.isOwnerOrAdmin(#id, principal)")
     public ResponseEntity<Void> deleteReservation(@PathVariable Long id)

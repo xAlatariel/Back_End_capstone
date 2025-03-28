@@ -26,7 +26,6 @@ public class UserRegistrationDTO {
     @NotBlank(message = "Password obbligatoria")
     private String password;
 
-//   @NotBlank(message = "Conferma la password")
-//    private String confirmPassword;
+
 
 }

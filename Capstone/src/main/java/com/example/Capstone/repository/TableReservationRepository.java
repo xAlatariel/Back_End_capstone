@@ -22,6 +22,9 @@ public interface TableReservationRepository extends JpaRepository<TableReservati
     List<TableReservation> findByReservationDate(LocalDate date);
 
 
+    List<TableReservation> findByUserId(Long userId);
+
+
     @Query("SELECT COALESCE(SUM(t.numberOfPeople), 0) " +
             "FROM TableReservation t " +
             "WHERE t.reservationArea = :area " +

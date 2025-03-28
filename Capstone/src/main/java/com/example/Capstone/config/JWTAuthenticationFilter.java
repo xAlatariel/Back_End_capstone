@@ -38,7 +38,7 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Allow OPTIONS requests for CORS
+
         if (request.getMethod().equals("OPTIONS")) {
             filterChain.doFilter(request, response);
             return;
@@ -46,7 +46,7 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader("Authorization");
 
-        // If the path is public, continue without authentication
+
         String requestURI = request.getRequestURI();
         if (isPublicEndpoint(requestURI)) {
             filterChain.doFilter(request, response);
@@ -57,12 +57,12 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
         String userEmail = null;
 
         try {
-            // Check if the header exists and has the correct format
+
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
                 userEmail = jwtTools.extractEmail(token);
 
-                // If we have an email and there is no authentication in the context
+
                 if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     User user = userRepository.findByEmail(userEmail)
                             .orElseThrow(() -> new RuntimeException("User not found"));

@@ -31,6 +31,7 @@ public class UserController {
     @Autowired
     PasswordEncoder passwordEncoder;
 
+    //corretto
     @PostMapping("/register")
     public ResponseEntity<UserDTO> registerUser(
             @Valid @RequestBody UserRegistrationDTO registrationDTO,
@@ -48,29 +49,25 @@ public class UserController {
         return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
+    //corretto
     @PostMapping("/login")
     public ResponseEntity<APIResponse<TokenDTO>> login(
             @Valid @RequestBody LoginDTO credentials,
             BindingResult validation
     ) throws BadRequestException {
-        // Verifica gli errori di validazione
         if (validation.hasErrors()) {
             throw new BadRequestException("Invalid login data");
         }
 
-        // Trova l'utente tramite email
         try {
             User found = userService.findByEmail(credentials.email());
 
-            // Verifica la password usando PasswordEncoder
             if (!passwordEncoder.matches(credentials.password(), found.getPassword())) {
                 throw new BadRequestException("Wrong password");
             }
 
-            // Genera il token JWT
             String token = jwt.createToken(credentials.email(), found.getRuolo());
 
-            // Restituisci la risposta con il token
             APIResponse<TokenDTO> response = new APIResponse<>(APIStatus.SUCCESS, new TokenDTO(token));
             return ResponseEntity.ok(response);
         } catch (UserNotFoundException e) {
@@ -78,7 +75,7 @@ public class UserController {
         }
     }
 
-    // Recupera Utente per ID (SOLO ADMIN o utente stesso)
+    //da implementare
     @GetMapping("/{id}")
     @PreAuthorize("#id == principal.id or hasRole('ADMIN')")
     public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) throws UserNotFoundException {
@@ -86,7 +83,7 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
-    // Cambio Password (Utente stesso o ADMIN)
+    //da implimentare
     @PostMapping("/{id}/change-password")
     @PreAuthorize("#id == principal.id or hasRole('ADMIN')")
     public ResponseEntity<Void> changePassword(

@@ -32,7 +32,7 @@ public class TableReservation {
 
 
     @Column(nullable = false)
-    @Min(1)  @Max(12)
+    @Min(1)  @Max(20)
     private int numberOfPeople;
 
     @ManyToOne(fetch = FetchType.LAZY)

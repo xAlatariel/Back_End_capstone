@@ -43,7 +43,6 @@ public class TableReservationService {
         ReservationArea area = ReservationArea.valueOf(request.getReservationArea().toUpperCase());
         LocalDate date = request.getReservationDate();
 
-        // Capacity check
         int reservedSeats = reservationRepository.countReservedSeatsByAreaAndDate(area, date, date);
         int maxCapacity = getMaxCapacityForArea(area);
 
@@ -51,7 +50,6 @@ public class TableReservationService {
             throw new CapacityExceededException(area.name(), date, maxCapacity);
         }
 
-        // Create reservation
         TableReservation reservation = new TableReservation();
         reservation.setReservationDate(date);
         reservation.setReservationTime(request.getReservationTime());
@@ -86,24 +84,20 @@ public class TableReservationService {
         ReservationArea newArea = ReservationArea.valueOf(request.getReservationArea().toUpperCase());
         LocalDate newDate = request.getReservationDate();
 
-        // Check for capacity if date, area or number of people changes
         if (!reservation.getReservationDate().equals(newDate) ||
                 !reservation.getReservationArea().equals(newArea) ||
                 reservation.getNumberOfPeople() != request.getNumberOfPeople()) {
 
-            // First subtract the current number of people for that reservation
             int currentBookedSeats = reservationRepository.countReservedSeatsByAreaAndDate(
                     reservation.getReservationArea(), reservation.getReservationDate(), reservation.getReservationDate());
             int adjustedBookedSeats = currentBookedSeats - reservation.getNumberOfPeople();
 
-            // Then check if the new capacity is available
             int maxCapacity = getMaxCapacityForArea(newArea);
             if ((adjustedBookedSeats + request.getNumberOfPeople()) > maxCapacity) {
                 throw new CapacityExceededException(newArea.name(), newDate, maxCapacity);
             }
         }
 
-        // Update reservation
         reservation.setReservationDate(newDate);
         reservation.setReservationTime(request.getReservationTime());
         reservation.setNumberOfPeople(request.getNumberOfPeople());
@@ -128,6 +122,12 @@ public class TableReservationService {
                 .collect(Collectors.toList());
     }
 
+    public List<TableReservationResponseDTO> getReservationsByUserId(Long userId) {
+        return reservationRepository.findByUserId(userId)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
     // HELPER METHODS
     private void checkCapacity(LocalDate date, ReservationArea area, int numberOfPeople)
             throws CapacityExceededException {

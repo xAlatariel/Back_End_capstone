@@ -10,7 +10,7 @@ import java.time.LocalTime;
 @Data
 public class TableReservationResponseDTO {
     private Long id;
-    private LocalDate reservationDate;  // Campo aggiunto
+    private LocalDate reservationDate;
     private LocalTime reservationTime;
     private Integer numberOfPeople;
     private ReservationArea reservationArea;

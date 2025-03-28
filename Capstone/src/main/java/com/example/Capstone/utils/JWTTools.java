@@ -22,7 +22,6 @@ public class JWTTools {
     @Value("${spring.jwt.secret}")
     private String secret;
 
-    // Increased to 24 hours for convenience, adjust as needed
     private final long jwtExpirationMs = 24 * 60 * 60 * 1000;
 
     public String createToken(String email, Role role) {
