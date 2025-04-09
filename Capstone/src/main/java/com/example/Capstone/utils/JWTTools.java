@@ -22,7 +22,7 @@ public class JWTTools {
     @Value("${spring.jwt.secret}")
     private String secret;
 
-    private final long jwtExpirationMs = 24 * 60 * 60 * 1000;
+    private final long jwtExpirationMs = 8 * 60 * 60 * 1000;
 
     public String createToken(String email, Role role) {
         Map<String, Object> claims = new HashMap<>();
