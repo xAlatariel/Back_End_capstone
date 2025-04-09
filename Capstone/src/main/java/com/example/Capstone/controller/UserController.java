@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -51,29 +52,20 @@ public class UserController {
 
     //corretto
     @PostMapping("/login")
-    public ResponseEntity<APIResponse<TokenDTO>> login(
-            @Valid @RequestBody LoginDTO credentials,
-            BindingResult validation
-    ) throws BadRequestException {
-        if (validation.hasErrors()) {
-            throw new BadRequestException("Invalid login data");
+    public ResponseEntity<APIResponse<TokenDTO>> login(@Valid @RequestBody LoginDTO credentials) {
+        User found = userService.findByEmail(credentials.email());
+
+        if (!passwordEncoder.matches(credentials.password(), found.getPassword())) {
+            throw new BadCredentialsException("Wrong password");
         }
 
-        try {
-            User found = userService.findByEmail(credentials.email());
+        String token = jwt.createToken(credentials.email(), found.getRuolo());
 
-            if (!passwordEncoder.matches(credentials.password(), found.getPassword())) {
-                throw new BadRequestException("Wrong password");
-            }
-
-            String token = jwt.createToken(credentials.email(), found.getRuolo());
-
-            APIResponse<TokenDTO> response = new APIResponse<>(APIStatus.SUCCESS, new TokenDTO(token));
-            return ResponseEntity.ok(response);
-        } catch (UserNotFoundException e) {
-            throw new BadRequestException("User not found");
-        }
+        APIResponse<TokenDTO> response = new APIResponse<>(APIStatus.SUCCESS, new TokenDTO(token));
+        return ResponseEntity.ok(response);
     }
+
+
 
     //da implementare
     @GetMapping("/{id}")

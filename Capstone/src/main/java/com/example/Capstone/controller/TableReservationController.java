@@ -6,12 +6,9 @@ import com.example.Capstone.dto.TableReservationResponseDTO;
 import com.example.Capstone.entity.TableReservation;
 import com.example.Capstone.entity.ReservationArea;
 import com.example.Capstone.entity.User;
-import com.example.Capstone.exception.CapacityExceededException;
-import com.example.Capstone.exception.ReservationNotFoundException;
+import com.example.Capstone.exception.*;
 import com.example.Capstone.repository.TableReservationRepository;
 import com.example.Capstone.service.TableReservationService;
-import com.example.Capstone.exception.UserNotFoundException;
-import com.example.Capstone.exception.ReservationsFullException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,12 +22,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.*;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/api/reservations")
 @RequiredArgsConstructor
@@ -39,21 +30,18 @@ public class TableReservationController {
     private final TableReservationService reservationService;
     private final ReservationSecurityService securityService;
 
-
-
     //corretto
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN' )")
     public ResponseEntity<TableReservationResponseDTO> createReservation(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody TableReservationRequestDTO request
-    ) throws CapacityExceededException, UserNotFoundException {
+    ) throws CapacityExceededException, UserNotFoundException, InvalidReservationDateException,
+            InvalidReservationTimeException, InvalidNumberOfPeopleException {
         System.out.println("Utente autenticato: " + user.getEmail() + ", Ruolo: " + user.getRuolo()); // Debug
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(reservationService.createReservation(user.getId(), request));
     }
-
-
 
     //corretto
     @GetMapping("/{id}")
@@ -62,8 +50,6 @@ public class TableReservationController {
             throws ReservationNotFoundException {
         return ResponseEntity.ok(reservationService.getReservationById(id));
     }
-
-
 
     //corretto
     @GetMapping
@@ -96,7 +82,8 @@ public class TableReservationController {
     public ResponseEntity<TableReservationResponseDTO> updateReservation(
             @PathVariable Long id,
             @Valid @RequestBody TableReservationRequestDTO request
-    ) throws ReservationNotFoundException, CapacityExceededException {
+    ) throws ReservationNotFoundException, CapacityExceededException, InvalidReservationDateException,
+            InvalidReservationTimeException, InvalidNumberOfPeopleException, LateCancellationException {
         return ResponseEntity.ok(reservationService.updateReservation(id, request));
     }
 
@@ -104,10 +91,9 @@ public class TableReservationController {
     @DeleteMapping("/{id}")
     @PreAuthorize("@reservationSecurityService.isOwnerOrAdmin(#id, principal)")
     public ResponseEntity<Void> deleteReservation(@PathVariable Long id)
-            throws ReservationNotFoundException {
+            throws ReservationNotFoundException, LateCancellationException {
         reservationService.deleteReservation(id);
         return ResponseEntity.noContent().build();
     }
 }
-
 
