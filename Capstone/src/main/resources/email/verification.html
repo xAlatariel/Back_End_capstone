@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifica il tuo account - Ai Canipai</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 0;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #939480 0%, #E6DFD0 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+        }
+        .content {
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .content h2 {
+            color: #5D4037;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .content p {
+            color: #666666;
+            margin-bottom: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .verification-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #939480 0%, #5D4037 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: transform 0.3s ease;
+        }
+        .verification-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #939480;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .footer {
+            background-color: #5D4037;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #E6DFD0;
+            text-decoration: none;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #5D4037;
+            font-weight: bold;
+        }
+        @media screen and (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .verification-button {
+                padding: 12px 25px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">AC</div>
+        <h1 th:text="${restaurantName}">Ai Canipai</h1>
+        <p>Ristorante Tradizionale Toscano</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+        <h2>Benvenuto, <span th:text="${userName}">Cliente</span>!</h2>
+
+        <p>Grazie per esserti registrato su <strong th:text="${restaurantName}">Ai Canipai</strong>.
+            Per completare la registrazione e attivare il tuo account, clicca sul pulsante qui sotto:</p>
+
+        <a th:href="${verificationUrl}" class="verification-button">
+            ✓ Verifica il tuo Account
+        </a>
+
+        <div class="info-box">
+            <p><strong>⏱️ Importante:</strong></p>
+            <ul style="margin: 10px 0; padding-left: 20px; text-align: left;">
+                <li>Questo link è valido per <strong>24 ore</strong></li>
+                <li>Puoi utilizzarlo una sola volta</li>
+                <li>Se non hai richiesto questa registrazione, ignora questa email</li>
+            </ul>
+        </div>
+
+        <p style="color: #999; font-size: 14px;">
+            Se il pulsante non funziona, copia e incolla questo link nel tuo browser:<br>
+            <a th:href="${verificationUrl}" th:text="${verificationUrl}" style="word-break: break-all; color: #939480;">
+                Link di verifica
+            </a>
+        </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong th:text="${restaurantName}">Ai Canipai</strong></p>
+        <p>Via Roma, 22 - 55038 San Romano in Garfagnana (LU)</p>
+        <p>📞 0583 179 9307 | 📧 info@aicanipai.it</p>
+        <p style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
+            Questa email è stata inviata automaticamente. Non rispondere a questo messaggio.
+        </p>
+    </div>
+</div>
+</body>
+</html>

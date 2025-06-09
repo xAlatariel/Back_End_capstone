@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-class ResendEmailDTO {
+public class ResendEmailDTO {  // AGGIUNTO public
     @NotBlank(message = "L'email è obbligatoria")
     @Email(message = "Formato email non valido")
     private String email;

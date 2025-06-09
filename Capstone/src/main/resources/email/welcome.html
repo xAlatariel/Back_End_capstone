@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benvenuto in Ai Canipai!</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #939480 0%, #E6DFD0 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 300;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .welcome-message {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .welcome-message h2 {
+            color: #5D4037;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+        .features {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .features h3 {
+            color: #5D4037;
+            margin-top: 0;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            color: #666;
+            display: flex;
+            align-items: center;
+        }
+        .feature-list li::before {
+            content: "✓";
+            color: #939480;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #939480 0%, #5D4037 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: transform 0.3s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .info-section {
+            background-color: #fff;
+            border: 2px solid #E6DFD0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .footer {
+            background-color: #5D4037;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        .footer a {
+            color: #E6DFD0;
+            text-decoration: none;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: #5D4037;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">AC</div>
+        <h1 th:text="${restaurantName}">Ai Canipai</h1>
+        <p>🍝 La Tradizione Toscana nel Cuore della Garfagnana 🍝</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+        <div class="welcome-message">
+            <h2>🎉 Benvenuto, <span th:text="${userName}">Cliente</span>!</h2>
+            <p style="font-size: 18px; color: #666;">La tua registrazione è stata completata con successo!</p>
+        </div>
+
+        <p style="font-size: 16px; color: #555; text-align: center;">
+            Siamo entusiasti di averti nella famiglia di <strong th:text="${restaurantName}">Ai Canipai</strong>.
+            Ora puoi godere di tutti i vantaggi riservati ai nostri clienti registrati.
+        </p>
+
+        <div class="features">
+            <h3>🌟 Cosa puoi fare ora:</h3>
+            <ul class="feature-list">
+                <li>Prenotare tavoli online in modo semplice e veloce</li>
+                <li>Gestire le tue prenotazioni dal tuo account personale</li>
+                <li>Ricevere aggiornamenti su eventi speciali e menu stagionali</li>
+                <li>Accedere a offerte esclusive per i clienti registrati</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center;">
+            <a th:href="${frontendUrl}/ReservationPage" class="cta-button">
+                🍽️ Prenota il Tuo Primo Tavolo
+            </a>
+        </div>
+
+        <div class="info-section">
+            <h3 style="color: #5D4037; margin-top: 0;">📍 Vieni a trovarci:</h3>
+            <p style="margin: 5px 0;"><strong>Indirizzo:</strong> Via Roma, 22 - 55038 San Romano in Garfagnana (LU)</p>
+            <p style="margin: 5px 0;"><strong>Telefono:</strong> 0583 179 9307</p>
+            <p style="margin: 5px 0;"><strong>Orari:</strong></p>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li><strong>Pranzo:</strong> 12:00 - 15:00</li>
+                <li><strong>Cena:</strong> 19:00 - 23:00</li>
+                <li><strong>Chiuso:</strong> Lunedì</li>
+            </ul>
+        </div>
+
+        <p style="text-align: center; color: #666; font-style: italic;">
+            "Dove la tradizione incontra il sapore autentico della Garfagnana"
+        </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong th:text="${restaurantName}">Ai Canipai</strong></p>
+        <p>📧 <a href="mailto:info@aicanipai.it">info@aicanipai.it</a> |
+            🌐 <a th:href="${frontendUrl}" href="#">www.aicanipai.it</a></p>
+        <p style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
+            Grazie per aver scelto Ai Canipai. Ti aspettiamo presto!
+        </p>
+    </div>
+</div>
+</body>
+</html>
