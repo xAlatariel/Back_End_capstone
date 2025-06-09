@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
@@ -31,20 +31,9 @@
 	</properties>
 	<dependencies>
 
-
-
-
-
-
-		<!-- Già inclusa in Spring Boot, ma la aggiungiamo esplicitamente per chiarezza -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-logging</artifactId>
-		</dependency>
-
-
-
-
+		<!-- ============================================ -->
+		<!-- SPRING BOOT CORE STARTERS -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -70,6 +59,67 @@
 			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
 		</dependency>
 
+		<!-- ============================================ -->
+		<!-- EMAIL & COMMUNICATION -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- SCHEDULING & ASYNC SUPPORT -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context-support</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- REACTIVE WEB CLIENT (for reCAPTCHA calls) -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- RATE LIMITING - BUCKET4J (Java 17 compatible) -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-core</artifactId>
+			<version>8.14.0</version>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- reCAPTCHA INTEGRATION -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>com.github.mkopylec</groupId>
+			<artifactId>recaptcha-spring-boot-starter</artifactId>
+			<version>2.3.1</version>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- ENHANCED VALIDATION -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.hibernate.validator</groupId>
+			<artifactId>hibernate-validator</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- LOGGING -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-logging</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- DEVELOPMENT TOOLS -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-devtools</artifactId>
@@ -77,18 +127,27 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- ============================================ -->
+		<!-- DATABASE -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- ============================================ -->
+		<!-- UTILITIES -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
 
+		<!-- ============================================ -->
+		<!-- TESTING -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -100,6 +159,9 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- ============================================ -->
+		<!-- JWT AUTHENTICATION -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
@@ -118,6 +180,9 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- ============================================ -->
+		<!-- API DOCUMENTATION -->
+		<!-- ============================================ -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
