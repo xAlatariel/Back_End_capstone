@@ -40,138 +40,64 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Gestione OPTIONS per CORS
-        if (request.getMethod().equals("OPTIONS")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         final String authHeader = request.getHeader("Authorization");
-        String requestURI = request.getRequestURI();
 
-        // Skip JWT validation per endpoint pubblici
-        if (isPublicEndpoint(requestURI)) {
+        // 1. Se l'header non esiste o non inizia con "Bearer ", procedi senza autenticare.
+        //    Sarà compito di SecurityConfig decidere se questo endpoint era pubblico o meno.
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = null;
+        // 2. Estrai il token e l'email dell'utente
+        String token = authHeader.substring(7);
         String userEmail = null;
 
         try {
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                token = authHeader.substring(7);
+            userEmail = jwtTools.extractEmail(token);
 
-                // Validazione formato token
-                if (token.trim().isEmpty()) {
-                    sendError(response, "Token JWT vuoto");
-                    return;
-                }
+            // 3. Se abbiamo l'email e non c'è già un'autenticazione nel contesto di sicurezza
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                User user = userRepository.findByEmail(userEmail)
+                        .orElseThrow(() -> new RuntimeException("Utente associato al token non trovato"));
 
-                userEmail = jwtTools.extractEmail(token);
+                // 4. Valida il token e lo stato dell'utente
+                if (jwtTools.validateToken(token, user.getEmail())) {
 
-                if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    User user = userRepository.findByEmail(userEmail)
-                            .orElseThrow(() -> new RuntimeException("Utente non trovato"));
-
-                    // Controlli di sicurezza aggiuntivi
+                    // Controlli sullo stato dell'utente (opzionali qui, ma buona pratica)
                     if (!user.getEnabled()) {
-                        sendError(response, "Account disabilitato");
-                        return;
+                        log.warn("Tentativo di accesso con token valido per account disabilitato: {}", userEmail);
+                        // L'eccezione verrà gestita dal JwtAuthenticationEntryPoint
+                        throw new RuntimeException("Account disabilitato");
                     }
 
-                    if (!user.getEmailVerified()) {
-                        sendError(response, "Email non verificata");
-                        return;
-                    }
-
-                    if (user.isAccountLocked()) {
-                        sendError(response, "Account temporaneamente bloccato");
-                        return;
-                    }
-
-                    if (jwtTools.validateToken(token, userEmail)) {
-                        // Creazione del contesto di sicurezza
-                        SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRuolo().name());
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                user,
-                                null,
-                                Collections.singletonList(authority)
-                        );
-
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                        log.debug("Utente autenticato: {} con ruolo: {}", userEmail, user.getRuolo());
-                    }
+                    // 5. Crea l'oggetto di autenticazione e impostalo nel contesto di sicurezza
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            user,
+                            null,
+                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRuolo().name()))
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    log.debug("Utente autenticato con successo tramite JWT: {}", userEmail);
                 }
-            } else if (!isPublicEndpoint(requestURI)) {
-                // Token mancante per endpoint protetti
-                log.warn("Tentativo di accesso senza token a endpoint protetto: {}", requestURI);
-                sendError(response, "Token di autorizzazione richiesto");
-                return;
             }
 
             filterChain.doFilter(request, response);
 
         } catch (ExpiredJwtException e) {
-            log.warn("Token JWT scaduto per utente: {}", userEmail);
-            sendError(response, "Token JWT scaduto");
-        } catch (MalformedJwtException e) {
-            log.warn("Token JWT malformato da IP: {}", getClientIpAddress(request));
-            sendError(response, "Token JWT non valido");
-        } catch (JwtException e) {
-            log.warn("Errore JWT: {}", e.getMessage());
-            sendError(response, "Errore token JWT: " + e.getMessage());
+            log.warn("Token JWT scaduto per utente: {}", e.getClaims().getSubject());
+            // Lascia che l'entry point gestisca l'errore di token scaduto
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\":\"Token scaduto\"}");
         } catch (Exception e) {
-            log.error("Errore di autenticazione: {}", e.getMessage(), e);
-            sendError(response, "Errore di autenticazione");
+            log.error("Errore nel filtro JWT: {}", e.getMessage());
+            // Per altri errori, passa al gestore di eccezioni successivo
+            filterChain.doFilter(request, response);
         }
     }
 
-    private boolean isPublicEndpoint(String uri) {
-        List<String> publicEndpoints = List.of(
-                "/api/users/register",
-                "/api/users/login",
-                "/api/users/verify-email",
-                "/api/users/resend-verification",
-                "/api/users/account-status",
-                "/api/health",
-                "/api/info",
-                "/swagger-ui",
-                "/v3/api-docs",
-                "/actuator/health"
-        );
 
-        return publicEndpoints.stream().anyMatch(uri::startsWith);
-    }
 
-    private void sendError(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType("application/json;charset=UTF-8");
-        response.setCharacterEncoding("UTF-8");
 
-        String jsonResponse = String.format(
-                "{\"timestamp\":\"%s\",\"status\":401,\"error\":\"Unauthorized\",\"message\":\"%s\"}",
-                java.time.LocalDateTime.now().toString(),
-                message
-        );
-
-        response.getWriter().write(jsonResponse);
-        response.getWriter().flush();
-    }
-
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-
-        return request.getRemoteAddr();
-    }
 }
