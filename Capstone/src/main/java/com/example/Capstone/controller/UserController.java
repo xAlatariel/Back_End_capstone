@@ -20,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,6 +40,9 @@ public class UserController {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    // ===================================================================
+    // REGISTRAZIONE UTENTE
+    // ===================================================================
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(
             @Valid @RequestBody UserRegistrationDTO registrationDTO,
@@ -89,6 +93,66 @@ public class UserController {
         }
     }
 
+    // ===================================================================
+    // LOGIN UTENTE
+    // ===================================================================
+    @PostMapping("/login")
+    public ResponseEntity<?> login(
+            @Valid @RequestBody LoginDTO loginDTO,
+            HttpServletRequest request
+    ) {
+        try {
+            // Rate limiting check
+            String clientIp = rateLimitingService.getClientIp(request);
+            if (!rateLimitingService.isLoginAllowed(clientIp)) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di login. Riprova più tardi."));
+            }
+
+            User authenticatedUser = userService.authenticateUser(loginDTO.email(), loginDTO.password());
+
+            // Reset failed login attempts on successful authentication
+            authenticatedUser.resetFailedLoginAttempts();
+            authenticatedUser.updateLastLogin();
+            userService.saveUser(authenticatedUser);
+
+            // Generate JWT token
+            String token = jwt.createToken(authenticatedUser);
+
+            // Create response
+            UserDTO userDTO = userService.convertToDTO(authenticatedUser);
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("token", token);
+            responseData.put("user", userDTO);
+
+            log.info("Login effettuato con successo per: {} da IP: {}", loginDTO.email(), clientIp);
+
+            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Login effettuato con successo", responseData));
+
+        } catch (RuntimeException e) {
+            log.warn("Tentativo di login fallito per {}: {}", loginDTO.email(), e.getMessage());
+
+            // Increment failed login attempts if user exists
+            try {
+                User user = userService.findByEmail(loginDTO.email());
+                user.incrementFailedLoginAttempts();
+                userService.saveUser(user);
+            } catch (UserNotFoundException ignored) {
+                // User doesn't exist, ignore
+            }
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
+        } catch (Exception e) {
+            log.error("Errore durante il login per {}", loginDTO.email(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>(APIStatus.ERROR, "Login fallito. Riprova più tardi."));
+        }
+    }
+
+    // ===================================================================
+    // VERIFICA EMAIL - ENDPOINT POST (per frontend)
+    // ===================================================================
     @PostMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@Valid @RequestBody EmailVerificationDTO verificationDTO) {
         try {
@@ -111,7 +175,9 @@ public class UserController {
         }
     }
 
-    // NUOVO ENDPOINT GET PER LA VERIFICA EMAIL (per link da email)
+    // ===================================================================
+    // VERIFICA EMAIL - ENDPOINT GET (per link nelle email)
+    // ===================================================================
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmailGet(@RequestParam("token") String token) {
         try {
@@ -122,40 +188,43 @@ public class UserController {
             if (verified) {
                 log.info("Email verificata con successo via GET per token: {}", token);
 
-                Map<String, Object> response = new HashMap<>();
-                response.put("status", "SUCCESS");
-                response.put("message", "Email verificata con successo! Ora puoi effettuare il login.");
-                response.put("redirect", frontendUrl + "/?verified=success");
+                // Crea URL con messaggio di successo
+                String successMessage = "✅ Email verificata con successo! Ora puoi effettuare il login.";
+                String redirectUrl = frontendUrl + "/?verified=success&message=" +
+                        URLEncoder.encode(successMessage, "UTF-8");
 
                 return ResponseEntity.status(HttpStatus.FOUND)
-                        .header("Location", frontendUrl + "/?verified=success")
-                        .body(response);
+                        .header("Location", redirectUrl)
+                        .body("Reindirizzamento in corso...");
             } else {
                 log.warn("Verifica email GET fallita per token: {}", token);
 
-                Map<String, Object> response = new HashMap<>();
-                response.put("status", "ERROR");
-                response.put("message", "Token di verifica non valido o scaduto");
-                response.put("redirect", frontendUrl + "/?verified=error");
+                // Crea URL con messaggio di errore
+                String errorMessage = "❌ Token di verifica non valido o scaduto";
+                String redirectUrl = frontendUrl + "/?verified=error&message=" +
+                        URLEncoder.encode(errorMessage, "UTF-8");
 
                 return ResponseEntity.status(HttpStatus.FOUND)
-                        .header("Location", frontendUrl + "/?verified=error")
-                        .body(response);
+                        .header("Location", redirectUrl)
+                        .body("Reindirizzamento in corso...");
             }
         } catch (Exception e) {
             log.error("Errore durante la verifica email GET", e);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "ERROR");
-            response.put("message", "Verifica fallita. Riprova più tardi.");
-            response.put("redirect", frontendUrl + "/?verified=error");
+            // Crea URL con messaggio di errore generico
+            String errorMessage = "❌ Verifica fallita. Riprova più tardi.";
+            String redirectUrl = frontendUrl + "/?verified=error&message=" +
+                    URLEncoder.encode(errorMessage, "UTF-8");
 
             return ResponseEntity.status(HttpStatus.FOUND)
-                    .header("Location", frontendUrl + "/?verified=error")
-                    .body(response);
+                    .header("Location", redirectUrl)
+                    .body("Reindirizzamento in corso...");
         }
     }
 
+    // ===================================================================
+    // REINVIO EMAIL DI VERIFICA
+    // ===================================================================
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerificationEmail(
             @Valid @RequestBody ResendEmailDTO resendEmailDTO,
@@ -166,86 +235,103 @@ public class UserController {
             String clientIp = rateLimitingService.getClientIp(request);
             if (!rateLimitingService.isEmailResendAllowed(clientIp)) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(new APIResponse<>(APIStatus.ERROR,
-                                "Troppi tentativi di reinvio email. Riprova più tardi."));
+                        .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di reinvio email. Riprova più tardi."));
             }
 
             emailVerificationService.resendVerificationEmail(resendEmailDTO.getEmail());
 
-            log.info("Email di verifica reinviata a: {}", resendEmailDTO.getEmail());
+            log.info("Email di verifica reinviata per: {}", resendEmailDTO.getEmail());
+
             return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS,
-                    "Email di verifica inviata! Controlla la tua casella di posta."));
+                    "Email di verifica reinviata. Controlla la tua casella di posta."));
 
         } catch (UserNotFoundException e) {
-            // Non rivelare se l'email esiste o no per sicurezza
-            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS,
-                    "Se l'email esiste, un link di verifica è stato inviato."));
+            log.warn("Tentativo di reinvio per email non registrata: {}", resendEmailDTO.getEmail());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (IllegalStateException e) {
+            log.warn("Tentativo di reinvio per email già verificata: {}", resendEmailDTO.getEmail());
             return ResponseEntity.badRequest()
                     .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore durante il reinvio email di verifica", e);
+            log.error("Errore durante il reinvio email per {}", resendEmailDTO.getEmail(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new APIResponse<>(APIStatus.ERROR, "Invio email fallito. Riprova più tardi."));
+                    .body(new APIResponse<>(APIStatus.ERROR, "Reinvio fallito. Riprova più tardi."));
         }
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(
-            @Valid @RequestBody LoginDTO credentials,
-            HttpServletRequest request
+    // ===================================================================
+    // STATO ACCOUNT
+    // ===================================================================
+    @GetMapping("/account-status")
+    public ResponseEntity<?> getAccountStatus(@RequestParam("email") String email) {
+        try {
+            User user = userService.findByEmail(email);
+
+            Map<String, Object> status = new HashMap<>();
+            status.put("email", user.getEmail());
+            status.put("emailVerified", user.getEmailVerified());
+            status.put("enabled", user.getEnabled());
+            status.put("accountStatus", user.getAccountStatus());
+            status.put("accountLocked", user.isAccountLocked());
+
+            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Status recuperato", status));
+
+        } catch (UserNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new APIResponse<>(APIStatus.ERROR, "Utente non trovato"));
+        } catch (Exception e) {
+            log.error("Errore durante il recupero dello status per {}", email, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>(APIStatus.ERROR, "Errore nel recupero dello status"));
+        }
+    }
+
+    // ===================================================================
+    // PROFILO UTENTE
+    // ===================================================================
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or authentication.name == @userService.findById(#id).email")
+    public ResponseEntity<?> getUserById(@PathVariable Long id) {
+        try {
+            User user = userService.findById(id);
+            UserDTO userDTO = userService.convertToDTO(user);
+
+            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Utente trovato", userDTO));
+
+        } catch (UserNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
+        } catch (Exception e) {
+            log.error("Errore durante il recupero dell'utente con ID {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>(APIStatus.ERROR, "Errore nel recupero dell'utente"));
+        }
+    }
+
+    // ===================================================================
+    // CAMBIO PASSWORD
+    // ===================================================================
+    @PostMapping("/{id}/change-password")
+    @PreAuthorize("hasRole('ADMIN') or authentication.name == @userService.findById(#id).email")
+    public ResponseEntity<?> changePassword(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangePasswordDTO changePasswordDTO
     ) {
         try {
-            // Rate limiting check
-            String clientIp = rateLimitingService.getClientIp(request);
-            if (!rateLimitingService.isLoginAllowed(clientIp)) {
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(new APIResponse<>(APIStatus.ERROR,
-                                "Troppi tentativi di login. Riprova più tardi."));
-            }
+            userService.changePassword(id, changePasswordDTO.getNewPassword());
 
-            User user = userService.authenticateUser(credentials.email(), credentials.password());
-            String token = jwt.createToken(credentials.email(), user.getRuolo());
+            log.info("Password cambiata con successo per utente ID: {}", id);
 
-            log.info("Utente loggato con successo: {} da IP: {}", credentials.email(), clientIp);
+            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Password cambiata con successo"));
 
-            APIResponse<TokenDTO> response = new APIResponse<>(APIStatus.SUCCESS, new TokenDTO(token));
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            log.warn("Login fallito per email: {} - {}", credentials.email(), e.getMessage());
-
-            // Fornisce messaggi di errore specifici per una migliore UX
-            if (e.getMessage().contains("Email non verificata")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
-            } else if (e.getMessage().contains("Account temporaneamente bloccato")) {
-                return ResponseEntity.status(HttpStatus.LOCKED)
-                        .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
-            } else {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new APIResponse<>(APIStatus.ERROR, "Credenziali non valide"));
-            }
+        } catch (UserNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore inaspettato durante il login", e);
+            log.error("Errore durante il cambio password per utente ID {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new APIResponse<>(APIStatus.ERROR, "Login fallito. Riprova più tardi."));
-        }
-    }
-
-    // Metodo rimosso perché mancano i metodi necessari nel JWT e UserService
-
-    @GetMapping("/account-status")
-    public ResponseEntity<?> getAccountStatus(@RequestParam String email) {
-        try {
-            boolean emailVerified = emailVerificationService.isEmailVerified(email);
-            Map<String, Object> status = new HashMap<>();
-            status.put("emailVerified", emailVerified);
-            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, status));
-        } catch (Exception e) {
-            log.error("Errore nel controllo status account per {}", email, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new APIResponse<>(APIStatus.ERROR, "Errore nel controllo status"));
+                    .body(new APIResponse<>(APIStatus.ERROR, "Errore nel cambio password"));
         }
     }
 }

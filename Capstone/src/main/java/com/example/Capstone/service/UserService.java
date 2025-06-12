@@ -61,14 +61,15 @@ public class UserService {
     }
 
     public User findById(Long id) {
-        Optional<User> userOptional = userRepository.findById(id);
-        return userOptional.orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
     }
 
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
     }
+
 
     // Enhanced authentication check
     public User authenticateUser(String email, String password) {
@@ -103,6 +104,7 @@ public class UserService {
         return user;
     }
 
+
     // Get User by ID
     public UserDTO getUserById(Long id) throws UserNotFoundException {
         User user = userRepository.findById(id)
@@ -110,14 +112,15 @@ public class UserService {
         return convertToDTO(user);
     }
 
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
+
     // Change Password
     public void changePassword(Long userId, String newPassword) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
-
+        User user = findById(userId);
         user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-
+        saveUser(user);
         log.info("Password changed successfully for user: {}", user.getEmail());
     }
 
@@ -150,11 +153,17 @@ public class UserService {
         }
     }
 
-    private UserDTO convertToDTO(User user) {
+    public UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
         dto.setNome(user.getNome());
         dto.setCognome(user.getCognome());
         dto.setEmail(user.getEmail());
+        dto.setRuolo(user.getRuolo());
+        dto.setAccountStatus(user.getAccountStatus());
+        dto.setEmailVerified(user.getEmailVerified());
+        dto.setEnabled(user.getEnabled());
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setLastLogin(user.getLastLogin());
         return dto;
     }
-}

@@ -28,11 +28,16 @@ public class EmailService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    // AGGIUNTA: Variabile per URL del backend
+    @Value("${app.backend.url}")
+    private String backendUrl;
+
     public void sendEmailVerification(String toEmail, String userName, String verificationToken) {
         try {
             log.info("Tentativo di invio email di verifica a: {}", toEmail);
 
-            String verificationUrl = frontendUrl + "/verify-email?token=" + verificationToken;
+            // MODIFICA CRITICA: Punta direttamente al backend invece che al frontend
+            String verificationUrl = backendUrl + "/users/verify-email?token=" + verificationToken;
 
             // Prova prima con email semplice se Thymeleaf fallisce
             try {
@@ -80,6 +85,19 @@ public class EmailService {
         }
     }
 
+    private void sendHtmlEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+        helper.setFrom(fromEmail);
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        mailSender.send(message);
+        log.info("Email HTML inviata con successo a: {}", toEmail);
+    }
+
     public void sendWelcomeEmail(String toEmail, String userName) {
         try {
             // Fallback a email semplice
@@ -116,11 +134,11 @@ public class EmailService {
             message.setSubject("Reset della password - Ai Canipai");
             message.setText(String.format(
                     "Ciao %s,\n\n" +
-                            "Hai richiesto il reset della password per il tuo account Ai Canipai.\n\n" +
+                            "Hai richiesto il reset della tua password.\n\n" +
                             "Clicca sul seguente link per reimpostare la password:\n" +
                             "%s\n\n" +
-                            "Questo link scadrà tra 1 ora.\n\n" +
-                            "Se non hai richiesto questo reset, ignora questa email.\n\n" +
+                            "Questo link è valido per 24 ore.\n" +
+                            "Se non hai richiesto il reset, ignora questa email.\n\n" +
                             "Cordiali saluti,\n" +
                             "Il team di Ai Canipai",
                     userName, resetUrl
@@ -134,46 +152,34 @@ public class EmailService {
         }
     }
 
-    public void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
+    public void sendGenericEmail(String toEmail, String subject, String content) {
         try {
-            log.debug("Preparazione invio email HTML a: {}", to);
-
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setFrom(fromEmail);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(toEmail);
+            message.setSubject(subject);
+            message.setText(content);
 
             mailSender.send(message);
-            log.info("Email HTML inviata con successo a: {}", to);
+            log.info("Email generica inviata a: {} con oggetto: {}", toEmail, subject);
         } catch (Exception e) {
-            log.error("Errore nell'invio email HTML a {}: {}", to, e.getMessage(), e);
-            throw new MessagingException("Errore nell'invio email HTML", e);
+            log.error("Errore nell'invio email generica a {}: {}", toEmail, e.getMessage());
+            throw new RuntimeException("Errore nell'invio dell'email generica", e);
         }
     }
 
-    public void sendContactFormEmail(String name, String email, String phone, String message) {
+    public void sendHtmlEmailWithTemplate(String toEmail, String subject, String templateName, Map<String, Object> variables) {
         try {
-            SimpleMailMessage adminMessage = new SimpleMailMessage();
-            adminMessage.setFrom(fromEmail);
-            adminMessage.setTo(fromEmail); // Invia all'admin
-            adminMessage.setSubject("Nuovo messaggio dal sito - " + name);
-            adminMessage.setText(String.format(
-                    "Nuovo messaggio ricevuto dal form di contatto:\n\n" +
-                            "Nome: %s\n" +
-                            "Email: %s\n" +
-                            "Telefono: %s\n\n" +
-                            "Messaggio:\n%s",
-                    name, email, phone != null ? phone : "Non fornito", message
-            ));
+            Context context = new Context();
+            variables.forEach(context::setVariable);
 
-            mailSender.send(adminMessage);
-            log.info("Email di contatto inviata per: {}", name);
+            String htmlContent = templateEngine.process(templateName, context);
+            sendHtmlEmail(toEmail, subject, htmlContent);
+
+            log.info("Email HTML con template {} inviata a: {}", templateName, toEmail);
         } catch (Exception e) {
-            log.error("Errore nell'invio email di contatto per {}: {}", name, e.getMessage());
-            throw new RuntimeException("Errore nell'invio del messaggio di contatto", e);
+            log.error("Errore nell'invio email HTML con template a {}: {}", toEmail, e.getMessage());
+            throw new RuntimeException("Errore nell'invio dell'email HTML con template", e);
         }
     }
 }
