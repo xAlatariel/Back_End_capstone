@@ -129,8 +129,10 @@ public class User {
     public void verifyEmail() {
         this.emailVerified = true;
         this.emailVerifiedAt = LocalDateTime.now();
-        this.accountStatus = AccountStatus.ACTIVE;
-        this.enabled = true;
+        this.enabled = true; // IMPORTANTE: Abilita l'account dopo verifica email
+        this.accountStatus = AccountStatus.ACTIVE; // Cambia stato ad ACTIVE
+        this.updatedAt = LocalDateTime.now();
+        // Rimosso il log perché nelle entità JPA non è disponibile
     }
 
     public void incrementFailedLoginAttempts() {

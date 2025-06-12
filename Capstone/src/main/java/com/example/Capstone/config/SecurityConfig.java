@@ -99,6 +99,7 @@ public class SecurityConfig {
                                 "/api/users/verify-email",
                                 "/api/users/resend-verification",
                                 "/api/users/account-status",
+                                "/api/debug/**",  // AGGIUNTO: Endpoint debug pubblici (solo dev)
                                 "/api/health",
                                 "/api/info"
                         ).permitAll()

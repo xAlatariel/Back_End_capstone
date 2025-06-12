@@ -19,28 +19,28 @@ public class RateLimitingService {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
-    // Registration rate limiting: 3 attempts per 15 minutes per IP
+    // Registration rate limiting: 10 attempts per 15 minutes per IP (più permissivo per dev)
     public boolean isRegistrationAllowed(String clientIp) {
         String key = "registration:" + clientIp;
-        return getBucket(key, 3, Duration.ofMinutes(15)).tryConsume(1);
+        return getBucket(key, 10, Duration.ofMinutes(15)).tryConsume(1);
     }
 
-    // Login rate limiting: 5 attempts per hour per IP
+    // Login rate limiting: 20 attempts per hour per IP (AUMENTATO per dev/test)
     public boolean isLoginAllowed(String clientIp) {
         String key = "login:" + clientIp;
+        return getBucket(key, 20, Duration.ofHours(1)).tryConsume(1);
+    }
+
+    // Email verification resend: 5 attempts per hour per IP (aumentato)
+    public boolean isEmailResendAllowed(String clientIp) {
+        String key = "email_resend:" + clientIp;
         return getBucket(key, 5, Duration.ofHours(1)).tryConsume(1);
     }
 
-    // Email verification resend: 3 attempts per hour per IP
-    public boolean isEmailResendAllowed(String clientIp) {
-        String key = "email_resend:" + clientIp;
-        return getBucket(key, 3, Duration.ofHours(1)).tryConsume(1);
-    }
-
-    // General API rate limiting: 100 requests per minute per IP
+    // General API rate limiting: 200 requests per minute per IP (RADDOPPIATO)
     public boolean isApiCallAllowed(String clientIp) {
         String key = "api:" + clientIp;
-        return getBucket(key, 100, Duration.ofMinutes(1)).tryConsume(1);
+        return getBucket(key, 200, Duration.ofMinutes(1)).tryConsume(1);
     }
 
     private Bucket getBucket(String key, int capacity, Duration refillDuration) {
@@ -76,5 +76,18 @@ public class RateLimitingService {
             buckets.clear();
             log.info("Cleared rate limiting buckets cache");
         }
+    }
+
+    // METODO PER RESET MANUALE DURANTE DEVELOPMENT
+    public void resetRateLimitForIp(String clientIp) {
+        buckets.entrySet().removeIf(entry -> entry.getKey().contains(clientIp));
+        log.info("Rate limit reset per IP: {}", clientIp);
+    }
+
+    // METODO PER VERIFICARE LO STATO CORRENTE
+    public long getRemainingTokens(String clientIp, String operation) {
+        String key = operation + ":" + clientIp;
+        Bucket bucket = buckets.get(key);
+        return bucket != null ? bucket.getAvailableTokens() : -1;
     }
 }

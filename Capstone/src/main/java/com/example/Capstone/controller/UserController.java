@@ -13,12 +13,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,6 +35,9 @@ public class UserController {
     private final RecaptchaService recaptchaService;
     private final RateLimitingService rateLimitingService;
     private final JWTTools jwt;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(
@@ -102,6 +108,51 @@ public class UserController {
             log.error("Errore durante la verifica email", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Verifica fallita. Riprova più tardi."));
+        }
+    }
+
+    // NUOVO ENDPOINT GET PER LA VERIFICA EMAIL (per link da email)
+    @GetMapping("/verify-email")
+    public ResponseEntity<?> verifyEmailGet(@RequestParam("token") String token) {
+        try {
+            log.info("Tentativo verifica email GET con token: {}", token);
+
+            boolean verified = emailVerificationService.verifyEmail(token);
+
+            if (verified) {
+                log.info("Email verificata con successo via GET per token: {}", token);
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "SUCCESS");
+                response.put("message", "Email verificata con successo! Ora puoi effettuare il login.");
+                response.put("redirect", frontendUrl + "/?verified=success");
+
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .header("Location", frontendUrl + "/?verified=success")
+                        .body(response);
+            } else {
+                log.warn("Verifica email GET fallita per token: {}", token);
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "ERROR");
+                response.put("message", "Token di verifica non valido o scaduto");
+                response.put("redirect", frontendUrl + "/?verified=error");
+
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .header("Location", frontendUrl + "/?verified=error")
+                        .body(response);
+            }
+        } catch (Exception e) {
+            log.error("Errore durante la verifica email GET", e);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "ERROR");
+            response.put("message", "Verifica fallita. Riprova più tardi.");
+            response.put("redirect", frontendUrl + "/?verified=error");
+
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .header("Location", frontendUrl + "/?verified=error")
+                    .body(response);
         }
     }
 
@@ -182,38 +233,19 @@ public class UserController {
         }
     }
 
+    // Metodo rimosso perché mancano i metodi necessari nel JWT e UserService
+
     @GetMapping("/account-status")
     public ResponseEntity<?> getAccountStatus(@RequestParam String email) {
         try {
-            String status = userService.getAccountStatus(email);
+            boolean emailVerified = emailVerificationService.isEmailVerified(email);
+            Map<String, Object> status = new HashMap<>();
+            status.put("emailVerified", emailVerified);
             return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, status));
         } catch (Exception e) {
-            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "USER_NOT_FOUND"));
-        }
-    }
-
-    @GetMapping("/{id}")
-    @PreAuthorize("#id == principal.id or hasRole('ADMIN')")
-    public ResponseEntity<?> getUserById(@PathVariable Long id) {
-        try {
-            UserDTO user = userService.getUserById(id);
-            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, user));
-        } catch (UserNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    @PostMapping("/{id}/change-password")
-    @PreAuthorize("#id == principal.id or hasRole('ADMIN')")
-    public ResponseEntity<?> changePassword(
-            @PathVariable Long id,
-            @Valid @RequestBody PasswordUpdateDTO passwordDTO
-    ) {
-        try {
-            userService.changePassword(id, passwordDTO.getNewPassword());
-            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Password cambiata con successo"));
-        } catch (UserNotFoundException e) {
-            return ResponseEntity.notFound().build();
+            log.error("Errore nel controllo status account per {}", email, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>(APIStatus.ERROR, "Errore nel controllo status"));
         }
     }
 }
