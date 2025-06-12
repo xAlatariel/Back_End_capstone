@@ -20,7 +20,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -117,7 +116,7 @@ public class UserController {
             userService.saveUser(authenticatedUser);
 
             // Generate JWT token
-            String token = jwt.createToken(authenticatedUser);
+            String token = jwt.createToken(authenticatedUser.getEmail(), authenticatedUser.getRuolo());
 
             // Create response
             UserDTO userDTO = userService.convertToDTO(authenticatedUser);
@@ -163,100 +162,46 @@ public class UserController {
                 return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS,
                         "Email verificata con successo! Ora puoi effettuare il login."));
             } else {
-                log.warn("Verifica email fallita per token: {}", verificationDTO.getToken());
+                log.warn("Tentativo di verifica email con token non valido: {}", verificationDTO.getToken());
                 return ResponseEntity.badRequest()
                         .body(new APIResponse<>(APIStatus.ERROR,
-                                "Token di verifica non valido o scaduto"));
+                                "Token non valido o scaduto. Richiedi un nuovo link di verifica."));
             }
+
         } catch (Exception e) {
             log.error("Errore durante la verifica email", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new APIResponse<>(APIStatus.ERROR, "Verifica fallita. Riprova più tardi."));
+                    .body(new APIResponse<>(APIStatus.ERROR, "Errore durante la verifica. Riprova più tardi."));
         }
     }
 
     // ===================================================================
-    // VERIFICA EMAIL - ENDPOINT GET (per link nelle email)
+    // VERIFICA EMAIL - ENDPOINT GET (per link email)
     // ===================================================================
     @GetMapping("/verify-email")
-    public ResponseEntity<?> verifyEmailGet(@RequestParam("token") String token) {
+    public ResponseEntity<?> verifyEmailFromLink(@RequestParam("token") String token) {
         try {
-            log.info("Tentativo verifica email GET con token: {}", token);
-
             boolean verified = emailVerificationService.verifyEmail(token);
 
             if (verified) {
-                log.info("Email verificata con successo via GET per token: {}", token);
-
-                // Crea URL con messaggio di successo
-                String successMessage = "✅ Email verificata con successo! Ora puoi effettuare il login.";
-                String redirectUrl = frontendUrl + "/?verified=success&message=" +
-                        URLEncoder.encode(successMessage, "UTF-8");
-
+                log.info("Email verificata con successo per token: {}", token);
+                // Redirect al frontend con successo
                 return ResponseEntity.status(HttpStatus.FOUND)
-                        .header("Location", redirectUrl)
-                        .body("Reindirizzamento in corso...");
+                        .header("Location", frontendUrl + "/login?verified=true")
+                        .build();
             } else {
-                log.warn("Verifica email GET fallita per token: {}", token);
-
-                // Crea URL con messaggio di errore
-                String errorMessage = "❌ Token di verifica non valido o scaduto";
-                String redirectUrl = frontendUrl + "/?verified=error&message=" +
-                        URLEncoder.encode(errorMessage, "UTF-8");
-
+                log.warn("Tentativo di verifica email con token non valido: {}", token);
+                // Redirect al frontend con errore
                 return ResponseEntity.status(HttpStatus.FOUND)
-                        .header("Location", redirectUrl)
-                        .body("Reindirizzamento in corso...");
+                        .header("Location", frontendUrl + "/login?verified=false")
+                        .build();
             }
+
         } catch (Exception e) {
-            log.error("Errore durante la verifica email GET", e);
-
-            // Crea URL con messaggio di errore generico
-            String errorMessage = "❌ Verifica fallita. Riprova più tardi.";
-            String redirectUrl = frontendUrl + "/?verified=error&message=" +
-                    URLEncoder.encode(errorMessage, "UTF-8");
-
+            log.error("Errore durante la verifica email", e);
             return ResponseEntity.status(HttpStatus.FOUND)
-                    .header("Location", redirectUrl)
-                    .body("Reindirizzamento in corso...");
-        }
-    }
-
-    // ===================================================================
-    // REINVIO EMAIL DI VERIFICA
-    // ===================================================================
-    @PostMapping("/resend-verification")
-    public ResponseEntity<?> resendVerificationEmail(
-            @Valid @RequestBody ResendEmailDTO resendEmailDTO,
-            HttpServletRequest request
-    ) {
-        try {
-            // Rate limiting check
-            String clientIp = rateLimitingService.getClientIp(request);
-            if (!rateLimitingService.isEmailResendAllowed(clientIp)) {
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di reinvio email. Riprova più tardi."));
-            }
-
-            emailVerificationService.resendVerificationEmail(resendEmailDTO.getEmail());
-
-            log.info("Email di verifica reinviata per: {}", resendEmailDTO.getEmail());
-
-            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS,
-                    "Email di verifica reinviata. Controlla la tua casella di posta."));
-
-        } catch (UserNotFoundException e) {
-            log.warn("Tentativo di reinvio per email non registrata: {}", resendEmailDTO.getEmail());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
-        } catch (IllegalStateException e) {
-            log.warn("Tentativo di reinvio per email già verificata: {}", resendEmailDTO.getEmail());
-            return ResponseEntity.badRequest()
-                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
-        } catch (Exception e) {
-            log.error("Errore durante il reinvio email per {}", resendEmailDTO.getEmail(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new APIResponse<>(APIStatus.ERROR, "Reinvio fallito. Riprova più tardi."));
+                    .header("Location", frontendUrl + "/login?verified=error")
+                    .build();
         }
     }
 
@@ -332,6 +277,44 @@ public class UserController {
             log.error("Errore durante il cambio password per utente ID {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Errore nel cambio password"));
+        }
+    }
+
+    // ===================================================================
+    // REINVIO EMAIL DI VERIFICA
+    // ===================================================================
+    @PostMapping("/resend-verification")
+    public ResponseEntity<?> resendVerificationEmail(
+            @Valid @RequestBody ResendEmailDTO resendEmailDTO,
+            HttpServletRequest request
+    ) {
+        try {
+            // Rate limiting check
+            String clientIp = rateLimitingService.getClientIp(request);
+            if (!rateLimitingService.isEmailResendAllowed(clientIp)) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di reinvio email. Riprova più tardi."));
+            }
+
+            emailVerificationService.resendVerificationEmail(resendEmailDTO.getEmail());
+
+            log.info("Email di verifica reinviata per: {}", resendEmailDTO.getEmail());
+
+            return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS,
+                    "Email di verifica reinviata. Controlla la tua casella di posta."));
+
+        } catch (UserNotFoundException e) {
+            log.warn("Tentativo di reinvio per email non registrata: {}", resendEmailDTO.getEmail());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
+        } catch (IllegalStateException e) {
+            log.warn("Tentativo di reinvio per email già verificata: {}", resendEmailDTO.getEmail());
+            return ResponseEntity.badRequest()
+                    .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
+        } catch (Exception e) {
+            log.error("Errore durante il reinvio email per {}", resendEmailDTO.getEmail(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new APIResponse<>(APIStatus.ERROR, "Reinvio fallito. Riprova più tardi."));
         }
     }
 }

@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -27,12 +26,16 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
 
-    // User Registration with Email Verification
+    // ===================================================================
+    // REGISTRAZIONE UTENTE CON VERIFICA EMAIL
+    // ===================================================================
     public UserDTO registerUser(UserRegistrationDTO registrationDTO) throws UserAlreadyExistsException {
+        // Controllo se email già esistente
         if (userRepository.existsByEmail(registrationDTO.getEmail())) {
-            throw new UserAlreadyExistsException("Email already registered: " + registrationDTO.getEmail());
+            throw new UserAlreadyExistsException("Email già registrata: " + registrationDTO.getEmail());
         }
 
+        // Creazione nuovo utente
         User newUser = User.builder()
                 .nome(registrationDTO.getNome())
                 .cognome(registrationDTO.getCognome())
@@ -48,55 +51,47 @@ public class UserService {
 
         newUser = userRepository.save(newUser);
 
-        // Send verification email
+        // Invio email di verifica
         try {
             emailVerificationService.createAndSendVerificationToken(newUser);
-            log.info("User registered successfully and verification email sent: {}", newUser.getEmail());
+            log.info("Utente registrato con successo e email di verifica inviata: {}", newUser.getEmail());
         } catch (Exception e) {
-            log.error("Failed to send verification email for user: {}", newUser.getEmail(), e);
-            // Don't fail registration if email sending fails
+            log.error("Errore nell'invio dell'email di verifica per: {}", newUser.getEmail(), e);
+            // Non bloccare la registrazione se l'email fallisce
         }
 
         return convertToDTO(newUser);
     }
 
-    public User findById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
-    }
-
-    public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
-    }
-
-
-    // Enhanced authentication check
+    // ===================================================================
+    // AUTENTICAZIONE UTENTE
+    // ===================================================================
     public User authenticateUser(String email, String password) {
         User user = findByEmail(email);
 
-        // Check if account is locked
+        // Controllo se account è bloccato per troppi tentativi
         if (user.isAccountLocked()) {
-            throw new RuntimeException("Account is temporarily locked due to multiple failed login attempts");
+            throw new RuntimeException("Account temporaneamente bloccato per troppi tentativi di login falliti. Riprova più tardi.");
         }
 
-        // Check if email is verified
+        // Controllo se email è verificata
         if (!user.getEmailVerified()) {
-            throw new RuntimeException("Email not verified. Please check your email for verification link.");
+            throw new RuntimeException("Email non verificata. Controlla la tua casella di posta per il link di verifica.");
         }
 
-        // Check if account is enabled
+        // Controllo se account è abilitato
         if (!user.getEnabled()) {
-            throw new RuntimeException("Account is disabled. Please contact support.");
+            throw new RuntimeException("Account disabilitato. Contatta il supporto.");
         }
 
+        // Verifica password
         if (!passwordEncoder.matches(password, user.getPassword())) {
             user.incrementFailedLoginAttempts();
             userRepository.save(user);
-            throw new RuntimeException("Invalid credentials");
+            throw new RuntimeException("Credenziali non valide");
         }
 
-        // Reset failed attempts on successful login
+        // Reset tentativi falliti su login riuscito
         user.resetFailedLoginAttempts();
         user.updateLastLogin();
         userRepository.save(user);
@@ -104,27 +99,44 @@ public class UserService {
         return user;
     }
 
+    // ===================================================================
+    // METODI DI RICERCA UTENTI
+    // ===================================================================
+    public User findByEmail(String email) throws UserNotFoundException {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("Utente non trovato con email: " + email));
+    }
 
-    // Get User by ID
+    public User findById(Long id) throws UserNotFoundException {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("Utente non trovato con ID: " + id));
+    }
+
+    // Metodo per ottenere UserDTO by ID
     public UserDTO getUserById(Long id) throws UserNotFoundException {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + id));
+        User user = findById(id);
         return convertToDTO(user);
     }
 
+    // ===================================================================
+    // GESTIONE UTENTI
+    // ===================================================================
     public User saveUser(User user) {
         return userRepository.save(user);
     }
 
-    // Change Password
+    // Cambio password
     public void changePassword(Long userId, String newPassword) {
         User user = findById(userId);
         user.setPassword(passwordEncoder.encode(newPassword));
         saveUser(user);
-        log.info("Password changed successfully for user: {}", user.getEmail());
+        log.info("Password cambiata con successo per utente: {}", user.getEmail());
     }
 
-    // Check if user can login (email verified and account active)
+    // ===================================================================
+    // VERIFICA STATO ACCOUNT
+    // ===================================================================
+    // Controllo se l'utente può fare login
     public boolean canUserLogin(String email) {
         try {
             User user = findByEmail(email);
@@ -134,7 +146,7 @@ public class UserService {
         }
     }
 
-    // Get account status for troubleshooting
+    // Ottieni stato account per troubleshooting
     public String getAccountStatus(String email) {
         try {
             User user = findByEmail(email);
@@ -153,6 +165,9 @@ public class UserService {
         }
     }
 
+    // ===================================================================
+    // CONVERSIONE DTO
+    // ===================================================================
     public UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
@@ -165,5 +180,62 @@ public class UserService {
         dto.setEnabled(user.getEnabled());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setLastLogin(user.getLastLogin());
+        dto.setEmailVerifiedAt(user.getEmailVerifiedAt());
+        dto.setFailedLoginAttempts(user.getFailedLoginAttempts());
+        dto.setAccountLocked(user.isAccountLocked());
+        dto.setAccountVerified(user.isAccountVerified());
         return dto;
     }
+
+    // ===================================================================
+    // GESTIONE EMAIL VERIFICATION
+    // ===================================================================
+    public void enableUserAfterEmailVerification(String email) {
+        try {
+            User user = findByEmail(email);
+            user.verifyEmail(); // Questo metodo è già nell'entità User
+            saveUser(user);
+            log.info("Utente abilitato dopo verifica email: {}", email);
+        } catch (UserNotFoundException e) {
+            log.error("Tentativo di abilitare utente non esistente: {}", email);
+            throw e;
+        }
+    }
+
+    public void enableUserAfterEmailVerification(User user) {
+        user.verifyEmail();
+        saveUser(user);
+        log.info("Utente abilitato dopo verifica email: {}", user.getEmail());
+    }
+
+    // ===================================================================
+    // METODI DI UTILITÀ
+    // ===================================================================
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+    public long countUsers() {
+        return userRepository.count();
+    }
+
+    public long countActiveUsers() {
+        return userRepository.countActiveUsers();
+    }
+
+    public long countPendingVerificationUsers() {
+        return userRepository.countPendingVerificationUsers();
+    }
+
+    public long countEnabledUsers() {
+        return userRepository.countByEnabledTrue();
+    }
+
+    public long countEmailVerifiedUsers() {
+        return userRepository.countByEmailVerifiedTrue();
+    }
+
+    public long countEmailUnverifiedUsers() {
+        return userRepository.countByEmailVerifiedFalse();
+    }
+}
