@@ -11,6 +11,7 @@ import com.example.Capstone.repository.TableReservationRepository;
 import com.example.Capstone.service.TableReservationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/reservations")
 @RequiredArgsConstructor
@@ -30,70 +32,67 @@ public class TableReservationController {
     private final TableReservationService reservationService;
     private final ReservationSecurityService securityService;
 
-    //corretto
     @PostMapping
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN' )")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<TableReservationResponseDTO> createReservation(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody TableReservationRequestDTO request
     ) throws CapacityExceededException, UserNotFoundException, InvalidReservationDateException,
             InvalidReservationTimeException, InvalidNumberOfPeopleException {
-        System.out.println("Utente autenticato: " + user.getEmail() + ", Ruolo: " + user.getRuolo()); // Debug
+        log.debug("Creazione prenotazione per utente: {} con ruolo: {}", user.getEmail(), user.getRuolo());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(reservationService.createReservation(user.getId(), request));
     }
 
-    //corretto
     @GetMapping("/{id}")
-    @PreAuthorize("@reservationSecurityService.canAccessReservation(#id, principal)")
+    @PreAuthorize("hasRole('ADMIN') or @reservationSecurityService.canAccessReservation(#id, authentication.principal)")
     public ResponseEntity<TableReservationResponseDTO> getReservation(@PathVariable Long id)
             throws ReservationNotFoundException {
+        log.debug("Richiesta prenotazione con ID: {}", id);
         return ResponseEntity.ok(reservationService.getReservationById(id));
     }
 
-    //corretto
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TableReservationResponseDTO>> getAllReservations() {
+        log.debug("Richiesta tutte le prenotazioni (solo admin)");
         return ResponseEntity.ok(reservationService.getAllReservations());
     }
 
-    //corretto
     @GetMapping("/user")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<List<TableReservationResponseDTO>> getUserReservations(
             @AuthenticationPrincipal User user
     ) {
+        log.debug("Richiesta prenotazioni per utente: {}", user.getEmail());
         return ResponseEntity.ok(reservationService.getReservationsByUserId(user.getId()));
     }
 
-    //corretto
     @GetMapping("/date/{date}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TableReservationResponseDTO>> getReservationsByDate(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<TableReservationResponseDTO> reservations = reservationService.getReservationsByDate(date);
+        log.debug("Richiesta prenotazioni per data: {} (solo admin)", date);
         return ResponseEntity.ok(reservationService.getReservationsByDate(date));
     }
 
-    //corretto
     @PutMapping("/{id}")
-    @PreAuthorize("@reservationSecurityService.isOwner(#id, principal)")
+    @PreAuthorize("hasRole('ADMIN') or @reservationSecurityService.isOwner(#id, authentication.principal)")
     public ResponseEntity<TableReservationResponseDTO> updateReservation(
             @PathVariable Long id,
             @Valid @RequestBody TableReservationRequestDTO request
     ) throws ReservationNotFoundException, CapacityExceededException, InvalidReservationDateException,
             InvalidReservationTimeException, InvalidNumberOfPeopleException, LateCancellationException {
+        log.debug("Aggiornamento prenotazione ID: {}", id);
         return ResponseEntity.ok(reservationService.updateReservation(id, request));
     }
 
-    //corretto
     @DeleteMapping("/{id}")
-    @PreAuthorize("@reservationSecurityService.isOwnerOrAdmin(#id, principal)")
+    @PreAuthorize("hasRole('ADMIN') or @reservationSecurityService.isOwnerOrAdmin(#id, authentication.principal)")
     public ResponseEntity<Void> deleteReservation(@PathVariable Long id)
             throws ReservationNotFoundException, LateCancellationException {
+        log.debug("Cancellazione prenotazione ID: {}", id);
         reservationService.deleteReservation(id);
         return ResponseEntity.noContent().build();
     }
 }
-

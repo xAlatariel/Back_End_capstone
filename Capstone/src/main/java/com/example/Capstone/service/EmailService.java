@@ -28,7 +28,6 @@ public class EmailService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    // AGGIUNTA: Variabile per URL del backend
     @Value("${app.backend.url}")
     private String backendUrl;
 
@@ -36,10 +35,10 @@ public class EmailService {
         try {
             log.info("Tentativo di invio email di verifica a: {}", toEmail);
 
-            // MODIFICA CRITICA: Punta direttamente al backend invece che al frontend
-            String verificationUrl = backendUrl + "/users/verify-email?token=" + verificationToken;
+            // CORREZIONE CRITICA: URL corretto con prefisso /api
+            String verificationUrl = backendUrl + "/api/users/verify-email?token=" + verificationToken;
+            log.info("URL di verifica generato: {}", verificationUrl);
 
-            // Prova prima con email semplice se Thymeleaf fallisce
             try {
                 Context context = new Context();
                 context.setVariable("userName", userName);
@@ -48,6 +47,7 @@ public class EmailService {
 
                 String htmlContent = templateEngine.process("email/verification", context);
                 sendHtmlEmail(toEmail, "Conferma la tua registrazione - Ai Canipai", htmlContent);
+                log.info("Email HTML inviata con successo a: {}", toEmail);
             } catch (Exception e) {
                 log.warn("Fallback a email semplice per template error: {}", e.getMessage());
                 sendSimpleVerificationEmail(toEmail, userName, verificationUrl);
@@ -100,7 +100,6 @@ public class EmailService {
 
     public void sendWelcomeEmail(String toEmail, String userName) {
         try {
-            // Fallback a email semplice
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromEmail);
             message.setTo(toEmail);
@@ -120,7 +119,6 @@ public class EmailService {
             log.info("Email di benvenuto inviata a: {}", toEmail);
         } catch (Exception e) {
             log.error("Errore nell'invio email di benvenuto a {}: {}", toEmail, e.getMessage());
-            // Non rilanciare l'eccezione per email di benvenuto
         }
     }
 

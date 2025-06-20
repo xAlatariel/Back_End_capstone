@@ -19,28 +19,28 @@ public class RateLimitingService {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
-    // Registration rate limiting: 10 attempts per 15 minutes per IP (più permissivo per dev)
+    // Registration rate limiting: 20 attempts per 15 minutes per IP (PIÙ PERMISSIVO per dev)
     public boolean isRegistrationAllowed(String clientIp) {
         String key = "registration:" + clientIp;
-        return getBucket(key, 10, Duration.ofMinutes(15)).tryConsume(1);
+        return getBucket(key, 20, Duration.ofMinutes(15)).tryConsume(1);
     }
 
-    // Login rate limiting: 20 attempts per hour per IP (AUMENTATO per dev/test)
+    // Login rate limiting: 50 attempts per hour per IP (MOLTO PERMISSIVO per dev/test)
     public boolean isLoginAllowed(String clientIp) {
         String key = "login:" + clientIp;
-        return getBucket(key, 20, Duration.ofHours(1)).tryConsume(1);
+        return getBucket(key, 50, Duration.ofHours(1)).tryConsume(1);
     }
 
-    // Email verification resend: 5 attempts per hour per IP (aumentato)
+    // Email verification resend: 10 attempts per hour per IP (aumentato)
     public boolean isEmailResendAllowed(String clientIp) {
         String key = "email_resend:" + clientIp;
-        return getBucket(key, 5, Duration.ofHours(1)).tryConsume(1);
+        return getBucket(key, 10, Duration.ofHours(1)).tryConsume(1);
     }
 
-    // General API rate limiting: 200 requests per minute per IP (RADDOPPIATO)
+    // General API rate limiting: 500 requests per minute per IP (MOLTO PERMISSIVO)
     public boolean isApiCallAllowed(String clientIp) {
         String key = "api:" + clientIp;
-        return getBucket(key, 200, Duration.ofMinutes(1)).tryConsume(1);
+        return getBucket(key, 500, Duration.ofMinutes(1)).tryConsume(1);
     }
 
     private Bucket getBucket(String key, int capacity, Duration refillDuration) {
@@ -70,8 +70,6 @@ public class RateLimitingService {
 
     // Cleanup old buckets periodically
     public void cleanupOldBuckets() {
-        // This would be called by a scheduled task
-        // For now, we keep it simple
         if (buckets.size() > 10000) {
             buckets.clear();
             log.info("Cleared rate limiting buckets cache");

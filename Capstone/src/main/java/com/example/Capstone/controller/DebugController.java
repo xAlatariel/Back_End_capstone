@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -39,6 +38,7 @@ public class DebugController {
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Rate limit reset per IP: " + clientIp);
+            response.put("timestamp", LocalDateTime.now());
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -46,6 +46,7 @@ public class DebugController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Errore nel reset: " + e.getMessage());
+            response.put("timestamp", LocalDateTime.now());
 
             return ResponseEntity.status(500).body(response);
         }
@@ -62,11 +63,13 @@ public class DebugController {
             response.put("registrationTokens", rateLimitingService.getRemainingTokens(clientIp, "registration"));
             response.put("emailResendTokens", rateLimitingService.getRemainingTokens(clientIp, "email_resend"));
             response.put("apiTokens", rateLimitingService.getRemainingTokens(clientIp, "api"));
+            response.put("timestamp", LocalDateTime.now());
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Errore nel controllo status: " + e.getMessage());
+            response.put("timestamp", LocalDateTime.now());
             return ResponseEntity.status(500).body(response);
         }
     }
@@ -77,6 +80,7 @@ public class DebugController {
             User user = userRepository.findByEmail(email).orElse(null);
 
             Map<String, Object> response = new HashMap<>();
+            response.put("timestamp", LocalDateTime.now());
 
             if (user == null) {
                 response.put("email", email);
@@ -90,12 +94,15 @@ public class DebugController {
                 response.put("accountStatus", user.getAccountStatus().toString());
                 response.put("createdAt", user.getCreatedAt());
                 response.put("emailVerifiedAt", user.getEmailVerifiedAt());
+                response.put("accountLocked", user.isAccountLocked());
+                response.put("failedLoginAttempts", user.getFailedLoginAttempts());
             }
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Errore nel controllo status: " + e.getMessage());
+            response.put("timestamp", LocalDateTime.now());
             return ResponseEntity.status(500).body(response);
         }
     }
@@ -123,6 +130,7 @@ public class DebugController {
             response.put("emailVerified", user.getEmailVerified());
             response.put("enabled", user.getEnabled());
             response.put("accountStatus", user.getAccountStatus().toString());
+            response.put("timestamp", LocalDateTime.now());
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -130,6 +138,7 @@ public class DebugController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Errore nella verifica manuale: " + e.getMessage());
+            response.put("timestamp", LocalDateTime.now());
 
             return ResponseEntity.status(500).body(response);
         }
@@ -141,17 +150,34 @@ public class DebugController {
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Utente non trovato"));
 
-            // Semplificato senza List di token per evitare errori
+            // Cerca token di verifica
+            EmailVerificationToken token = tokenRepository.findByUser(user).orElse(null);
+
             Map<String, Object> response = new HashMap<>();
             response.put("email", email);
-            response.put("message", "Utente trovato");
             response.put("emailVerified", user.getEmailVerified());
             response.put("enabled", user.getEnabled());
+            response.put("timestamp", LocalDateTime.now());
+
+            if (token != null) {
+                Map<String, Object> tokenInfo = new HashMap<>();
+                tokenInfo.put("token", token.getToken());
+                tokenInfo.put("createdAt", token.getCreatedAt());
+                tokenInfo.put("expiresAt", token.getExpiresAt());
+                tokenInfo.put("used", token.getUsed());
+                tokenInfo.put("expired", token.isExpired());
+                tokenInfo.put("valid", token.isValid());
+                response.put("verificationToken", tokenInfo);
+            } else {
+                response.put("verificationToken", null);
+                response.put("message", "Nessun token di verifica trovato");
+            }
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Errore nel controllo: " + e.getMessage());
+            response.put("timestamp", LocalDateTime.now());
             return ResponseEntity.status(500).body(response);
         }
     }
@@ -159,12 +185,15 @@ public class DebugController {
     @DeleteMapping("/cleanup-expired-tokens")
     public ResponseEntity<?> cleanupExpiredTokens() {
         try {
-            // Semplificato per evitare errori con metodi non esistenti
-            log.info("Cleanup manuale richiesto");
+            LocalDateTime now = LocalDateTime.now();
+            tokenRepository.deleteExpiredTokens(now);
+
+            log.info("Cleanup manuale dei token scaduti completato");
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "Cleanup richiesto - implementazione da completare");
+            response.put("message", "Cleanup dei token scaduti completato");
+            response.put("timestamp", now);
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -172,8 +201,20 @@ public class DebugController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Errore nel cleanup: " + e.getMessage());
+            response.put("timestamp", LocalDateTime.now());
 
             return ResponseEntity.status(500).body(response);
         }
+    }
+
+    @GetMapping("/test-connection")
+    public ResponseEntity<?> testConnection() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("message", "Debug controller is working");
+        response.put("timestamp", LocalDateTime.now());
+        response.put("server", "Capstone Backend");
+
+        return ResponseEntity.ok(response);
     }
 }

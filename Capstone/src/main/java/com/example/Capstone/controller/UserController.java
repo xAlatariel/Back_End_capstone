@@ -50,9 +50,12 @@ public class UserController {
             BindingResult validation
     ) {
         try {
+            log.info("Tentativo di registrazione per email: {}", registrationDTO.getEmail());
+
             // Rate limiting check
             String clientIp = rateLimitingService.getClientIp(request);
             if (!rateLimitingService.isRegistrationAllowed(clientIp)) {
+                log.warn("Rate limit superato per registrazione da IP: {}", clientIp);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di registrazione. Riprova più tardi."));
             }
@@ -62,6 +65,7 @@ public class UserController {
                 String errors = validation.getAllErrors().stream()
                         .map(error -> error.getDefaultMessage())
                         .collect(Collectors.joining(", "));
+                log.warn("Errori di validazione per registrazione: {}", errors);
                 return ResponseEntity.badRequest()
                         .body(new APIResponse<>(APIStatus.ERROR, "Errori di validazione: " + errors));
             }
@@ -86,7 +90,7 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore durante la registrazione", e);
+            log.error("Errore durante la registrazione per {}: {}", registrationDTO.getEmail(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Registrazione fallita. Riprova più tardi."));
         }
@@ -101,9 +105,12 @@ public class UserController {
             HttpServletRequest request
     ) {
         try {
+            log.info("Tentativo di login per email: {}", loginDTO.email());
+
             // Rate limiting check
             String clientIp = rateLimitingService.getClientIp(request);
             if (!rateLimitingService.isLoginAllowed(clientIp)) {
+                log.warn("Rate limit superato per login da IP: {}", clientIp);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di login. Riprova più tardi."));
             }
@@ -143,7 +150,7 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore durante il login per {}", loginDTO.email(), e);
+            log.error("Errore durante il login per {}: {}", loginDTO.email(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Login fallito. Riprova più tardi."));
         }
@@ -155,6 +162,8 @@ public class UserController {
     @PostMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@Valid @RequestBody EmailVerificationDTO verificationDTO) {
         try {
+            log.info("Tentativo di verifica email con token: {}", verificationDTO.getToken());
+
             boolean verified = emailVerificationService.verifyEmail(verificationDTO.getToken());
 
             if (verified) {
@@ -169,7 +178,7 @@ public class UserController {
             }
 
         } catch (Exception e) {
-            log.error("Errore durante la verifica email", e);
+            log.error("Errore durante la verifica email per token: {}", verificationDTO.getToken(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Errore durante la verifica. Riprova più tardi."));
         }
@@ -181,6 +190,8 @@ public class UserController {
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmailFromLink(@RequestParam("token") String token) {
         try {
+            log.info("Tentativo di verifica email da link con token: {}", token);
+
             boolean verified = emailVerificationService.verifyEmail(token);
 
             if (verified) {
@@ -198,7 +209,7 @@ public class UserController {
             }
 
         } catch (Exception e) {
-            log.error("Errore durante la verifica email", e);
+            log.error("Errore durante la verifica email da link per token: {}", token, e);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header("Location", frontendUrl + "/login?verified=error")
                     .build();
@@ -211,6 +222,8 @@ public class UserController {
     @GetMapping("/account-status")
     public ResponseEntity<?> getAccountStatus(@RequestParam("email") String email) {
         try {
+            log.debug("Richiesta stato account per email: {}", email);
+
             User user = userService.findByEmail(email);
 
             Map<String, Object> status = new HashMap<>();
@@ -223,10 +236,11 @@ public class UserController {
             return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Status recuperato", status));
 
         } catch (UserNotFoundException e) {
+            log.warn("Richiesta stato per email non esistente: {}", email);
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new APIResponse<>(APIStatus.ERROR, "Utente non trovato"));
         } catch (Exception e) {
-            log.error("Errore durante il recupero dello status per {}", email, e);
+            log.error("Errore durante il recupero dello status per {}: {}", email, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Errore nel recupero dello status"));
         }
@@ -239,16 +253,19 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN') or authentication.name == @userService.findById(#id).email")
     public ResponseEntity<?> getUserById(@PathVariable Long id) {
         try {
+            log.debug("Richiesta dettagli utente per ID: {}", id);
+
             User user = userService.findById(id);
             UserDTO userDTO = userService.convertToDTO(user);
 
             return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Utente trovato", userDTO));
 
         } catch (UserNotFoundException e) {
+            log.warn("Richiesta utente per ID non esistente: {}", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore durante il recupero dell'utente con ID {}", id, e);
+            log.error("Errore durante il recupero dell'utente con ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Errore nel recupero dell'utente"));
         }
@@ -264,6 +281,8 @@ public class UserController {
             @Valid @RequestBody ChangePasswordDTO changePasswordDTO
     ) {
         try {
+            log.info("Tentativo di cambio password per utente ID: {}", id);
+
             userService.changePassword(id, changePasswordDTO.getNewPassword());
 
             log.info("Password cambiata con successo per utente ID: {}", id);
@@ -271,10 +290,11 @@ public class UserController {
             return ResponseEntity.ok(new APIResponse<>(APIStatus.SUCCESS, "Password cambiata con successo"));
 
         } catch (UserNotFoundException e) {
+            log.warn("Tentativo di cambio password per utente ID non esistente: {}", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore durante il cambio password per utente ID {}", id, e);
+            log.error("Errore durante il cambio password per utente ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Errore nel cambio password"));
         }
@@ -289,9 +309,12 @@ public class UserController {
             HttpServletRequest request
     ) {
         try {
+            log.info("Tentativo di reinvio email di verifica per: {}", resendEmailDTO.getEmail());
+
             // Rate limiting check
             String clientIp = rateLimitingService.getClientIp(request);
             if (!rateLimitingService.isEmailResendAllowed(clientIp)) {
+                log.warn("Rate limit superato per reinvio email da IP: {}", clientIp);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body(new APIResponse<>(APIStatus.ERROR, "Troppi tentativi di reinvio email. Riprova più tardi."));
             }
@@ -312,7 +335,7 @@ public class UserController {
             return ResponseEntity.badRequest()
                     .body(new APIResponse<>(APIStatus.ERROR, e.getMessage()));
         } catch (Exception e) {
-            log.error("Errore durante il reinvio email per {}", resendEmailDTO.getEmail(), e);
+            log.error("Errore durante il reinvio email per {}: {}", resendEmailDTO.getEmail(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new APIResponse<>(APIStatus.ERROR, "Reinvio fallito. Riprova più tardi."));
         }

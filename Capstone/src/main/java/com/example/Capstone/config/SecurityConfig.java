@@ -12,8 +12,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
-import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -45,49 +43,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // CONFIGURAZIONE HEADERS DI SICUREZZA
+                // CONFIGURAZIONE HEADERS DI SICUREZZA SEMPLIFICATA PER DEBUG
                 .headers(headers -> headers
-                        // Frame Options
                         .frameOptions(frameOptions -> frameOptions.deny())
-
-                        // Content Type Options
                         .contentTypeOptions(contentTypeOptions -> {})
-
-                        // HTTP Strict Transport Security
-                        .httpStrictTransportSecurity(hstsConfig -> hstsConfig
-                                .maxAgeInSeconds(31536000)
-                                .includeSubDomains(true)
-                                .preload(true))
-
-                        // Referrer Policy
-                        .referrerPolicy(referrerPolicy ->
-                                referrerPolicy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-
-                        // XSS Protection
-                        .xssProtection(xssConfig -> xssConfig
-                                .headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
-
-                        // Content Security Policy
-                        .contentSecurityPolicy(cspConfig -> cspConfig
-                                .policyDirectives("default-src 'self'; " +
-                                        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-                                        "style-src 'self' 'unsafe-inline'; " +
-                                        "img-src 'self' data: https:; " +
-                                        "font-src 'self' data:; " +
-                                        "frame-ancestors 'none'; " +
-                                        "form-action 'self'"))
-
-                        // Cache Control
-                        .cacheControl(cacheConfig -> {})
-
-                        // Custom headers di sicurezza
-                        .addHeaderWriter((request, response) -> {
-                            response.setHeader("X-Permitted-Cross-Domain-Policies", "none");
-                            response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-                            response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-                            response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-                            response.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
-                        })
                 )
 
                 // CONFIGURAZIONE AUTORIZZAZIONI
@@ -99,9 +58,10 @@ public class SecurityConfig {
                                 "/api/users/verify-email",
                                 "/api/users/resend-verification",
                                 "/api/users/account-status",
-                                "/api/debug/**",  // AGGIUNTO: Endpoint debug pubblici (solo dev)
+                                "/api/debug/**",
                                 "/api/health",
-                                "/api/info"
+                                "/api/info",
+                                "/error"
                         ).permitAll()
 
                         // Actuator endpoints (solo health)
@@ -138,21 +98,22 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Configurazione CORS sicura
-        List<String> allowedOrigins = Arrays.asList(corsAllowedOrigins.split(","));
-        configuration.setAllowedOriginPatterns(allowedOrigins); // Usa patterns per maggiore flessibilità
+        // CONFIGURAZIONE CORS PIÙ PERMISSIVA PER DEVELOPMENT
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+
+        // Oppure specifica origin esatti (decommentare se serve più sicurezza)
+        /*
+        List<String> allowedOrigins = Arrays.asList(
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000"
+        );
+        configuration.setAllowedOrigins(allowedOrigins);
+        */
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "X-Requested-With",
-                "Accept",
-                "Origin",
-                "Cache-Control",
-                "Pragma"
-        ));
-
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
                 "X-Total-Count"
@@ -162,13 +123,12 @@ public class SecurityConfig {
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
+        source.registerCorsConfiguration("/**", configuration); // Cambiato da /api/** a /**
         return source;
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // BCrypt con strength 12 per sicurezza massima
         return new BCryptPasswordEncoder(12);
     }
 }
