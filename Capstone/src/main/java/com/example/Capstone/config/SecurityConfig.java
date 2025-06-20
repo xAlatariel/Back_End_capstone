@@ -51,7 +51,7 @@ public class SecurityConfig {
 
                 // CONFIGURAZIONE AUTORIZZAZIONI
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoint pubblici
+                        // Endpoint pubblici esistenti
                         .requestMatchers(
                                 "/api/users/register",
                                 "/api/users/login",
@@ -64,20 +64,27 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
 
+                        // NUOVI ENDPOINT MENU PUBBLICI
+                        .requestMatchers(
+                                "/api/menus/active",
+                                "/api/menus/daily/today",
+                                "/api/menus/seasonal/current"
+                        ).permitAll()
+
                         // Actuator endpoints (solo health)
                         .requestMatchers("/actuator/health").permitAll()
 
                         // Swagger/OpenAPI (solo per development)
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-                        // Admin endpoints
+                        // ADMIN ENDPOINTS
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/reservations/date/**").hasRole("ADMIN")
-                        .requestMatchers("/api/reservations").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/api/menus/**").hasRole("ADMIN") // NUOVO: solo admin può gestire menu
 
                         // User endpoints protetti
+                        .requestMatchers("/api/reservations").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/users/**").authenticated()
-                        .requestMatchers("/api/reservations/**").authenticated()
 
                         // Tutti gli altri endpoint richiedono autenticazione
                         .anyRequest().authenticated()
