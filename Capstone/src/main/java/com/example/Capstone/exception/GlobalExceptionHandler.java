@@ -1,5 +1,6 @@
 package com.example.Capstone.exception;
 
+import com.example.Capstone.dto.ErrorResponseDTO;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
@@ -94,6 +95,20 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
+    @ExceptionHandler(MenuNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMenuNotFoundException(MenuNotFoundException ex) {
+        log.error("Menu non trovato: {}", ex.getMessage());
+
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                "MENU_NOT_FOUND",
+                ex.getMessage(),
+                HttpStatus.NOT_FOUND.value(),
+                LocalDateTime.now()
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
 
     @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
     public ResponseEntity<Map<String, Object>> handleAuthenticationException(

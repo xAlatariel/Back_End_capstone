@@ -1,18 +1,12 @@
 package com.example.Capstone.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "dishes",
-        indexes = {
-                @Index(name = "idx_dish_category", columnList = "category"),
-                @Index(name = "idx_dish_menu", columnList = "menu_id"),
-                @Index(name = "idx_dish_available", columnList = "is_available")
-        })
+@Table(name = "dishes")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,25 +18,20 @@ public class Dish {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Il nome del piatto è obbligatorio")
-    @Size(min = 2, max = 100, message = "Il nome deve essere tra 2 e 100 caratteri")
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false)
     private String name;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(length = 200)
-    private String ingredients; // Ingredienti principali
+    @Column(columnDefinition = "TEXT")
+    private String ingredients;
 
-    @NotNull(message = "La categoria è obbligatoria")
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false)
     private DishCategory category;
 
-    @DecimalMin(value = "0.0", inclusive = false, message = "Il prezzo deve essere maggiore di 0")
-    @Digits(integer = 5, fraction = 2, message = "Formato prezzo non valido")
-    @Column(precision = 7, scale = 2)
+    @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
     @Column(name = "is_available", nullable = false)
@@ -50,16 +39,15 @@ public class Dish {
     private Boolean isAvailable = true;
 
     @Column(name = "display_order")
-    private Integer displayOrder; // Per ordinamento nella visualizzazione
+    private Integer displayOrder;
 
-    @NotNull(message = "Il menu è obbligatorio")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "menu_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_dish_menu"))
+    @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;
 
-    // Metodi helper
+    // Metodo helper per il prezzo formattato
     public String getFormattedPrice() {
-        return price != null ? "€ " + price.toString() : "Prezzo da definire";
+        if (price == null) return "Prezzo da definire";
+        return String.format("€ %.2f", price);
     }
 }
